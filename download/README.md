@@ -1,6 +1,6 @@
 # CodeMap — Interactive Codebase Graph Visualizer
 
-> See your entire app at once. Trace workflows. Understand dependencies. Find what's connected.
+> See your entire app at once. Trace every workflow. Detect auth, navigation, state, forms, payments — automatically.
 
 CodeMap is a local static analysis tool that maps your React Native / React / Node.js codebase into an interactive graph. It parses every file with Babel, builds a knowledge graph in SQLite, and serves a rich visual explorer — no cloud, no API keys, no data leaving your machine.
 
@@ -8,8 +8,12 @@ CodeMap is a local static analysis tool that maps your React Native / React / No
 
 - **Full Codebase Map** — Every file, function, component, hook, store, service, and API endpoint as interactive graph nodes
 - **5 Graph Views** — Dependencies, Component Tree, Call Graph, API Flow, Architecture
-- **Workflow Tracing** — Trace end-to-end flows like Authentication, Payment, Data Fetching, State Management
-- **Auto-Detected Traces** — Automatically discovers common workflows by naming patterns
+- **15+ Auto-Detected Workflow Traces** — Auth (6 sub-flows!), Navigation, Data Fetch, State, Forms, Payment, Errors, Storage, Real-time, Permissions, Notifications, Analytics, Onboarding, Theme, i18n
+- **40+ Sub-Flows** — Granular tracing within each workflow (login, logout, token refresh, protected routes, signup, password reset under Auth alone)
+- **Deep Semantic Extraction** — Detects React Navigation, Auth contexts, Context API, Redux/Zustand, Formik, Error Boundaries, WebSocket, AsyncStorage, Permissions, Deep Links, Push Notifications, Analytics, and more
+- **Sub-Flow Architecture** — Each trace contains granular sub-flows (e.g., Auth → Login, Logout, Token Refresh, Protected Route, Signup, Password Reset)
+- **Security-Aware** — Flags secure storage access, auth token handling, and sensitive data flows
+- **Auto-Detected Traces** — Automatically discovers 15+ workflow categories by semantic tags + naming patterns
 - **Custom Traces** — Define your own traces in `.codegraph/traces.json`
 - **Graph Algorithms** — Cycle detection, community detection, impact analysis, dead code detection
 - **SQLite Storage** — Incremental reindexing, FTS5 full-text search, WAL mode
@@ -106,14 +110,25 @@ Create `.codegraph/traces.json` in your project root:
 
 ### Auto-Detected Traces
 
-CodeMap automatically detects these common workflows:
-- **Authentication** — Login/signup → auth service → token → API calls
-- **Navigation** — Screen routing and navigation flows
-- **Data Fetching** — Component → hook → API call → data rendering
-- **State Management** — Store → dispatch → selector → component
-- **Payment** — Checkout → processing → confirmation
-- **Onboarding** — Welcome → steps → completion
-- **Error Handling** — Error boundary → error service → reporting
+CodeMap automatically detects 15+ workflow categories with 40+ sub-flows:
+
+| Trace | Sub-Flows | What It Detects |
+|-------|-----------|-----------------|
+| 🔐 **Authentication** | Login, Logout, Token Refresh, Protected Route, Signup, Password Reset | useAuth, isAuthenticated, token, AuthContext, ProtectedRoute |
+| 🧭 **Navigation** | Screen Navigation, Deep Links | navigation.navigate, useNavigation, Stack.Screen, Linking |
+| 📡 **Data Fetching** | Query/Loading, Mutation/Writing | useQuery, useMutation, fetch, axios, cache invalidation |
+| 🗄️ **State Management** | Store Creation, Action Dispatch | createSlice, createStore, useSelector, useDispatch, zustand |
+| 📝 **Forms** | Form Submission, Form Validation | useForm, Formik, handleSubmit, validate, yup/zod |
+| 💳 **Payment** | Checkout | cart, checkout, stripe, payment, order |
+| ⚠️ **Error Handling** | Error Boundary | ErrorBoundary, componentDidCatch, error reporting |
+| 💾 **Storage** | Data Persistence | AsyncStorage, SecureStore, localStorage, MMKV, persist |
+| ⚡ **Real-time** | WebSocket | WebSocket, socket.io, useWebSocket, emit/on |
+| 🔒 **Permissions** | Permission Request | checkPermission, requestPermission, camera, location |
+| 🔔 **Notifications** | Push Notifications | registerForPush, FCM, OneSignal, Notifee |
+| 📊 **Analytics** | Event Tracking | trackEvent, logEvent, Firebase, Mixpanel, Amplitude |
+| 🎯 **Onboarding** | Welcome Steps | onboarding, welcome, tutorial, getting-started |
+| 🎨 **Theme** | Theme Switching | ThemeProvider, useTheme, darkMode, Appearance |
+| 🌍 **i18n** | Translation | useTranslation, i18n, formatMessage, LanguageProvider |
 
 ## Visualizer Guide
 
@@ -207,6 +222,15 @@ code_map/
 | contains | Fine dot | File contains symbol |
 | extends | Long dash | Class inheritance |
 | references | Dash-dot | Variable/symbol reference |
+| navigates_to | Blue solid | React Navigation: navigate/push/replace |
+| uses_context | Purple dash | useContext() call |
+| dispatches | Orange dotted | Redux/Zustand dispatch |
+| storage_access | Cyan dash | AsyncStorage/SecureStore access |
+| defines_route | Blue dotted | Stack.Screen/Tab.Screen route definition |
+| deep_link | Green dash | Linking.openURL / deep link |
+| tracks_event | Yellow dotted | Analytics event tracking |
+| emits_event | Teal dash | WebSocket/socket emit |
+| subscribes_event | Teal dotted | WebSocket/socket on/listen |
 
 ## Graph Algorithms
 

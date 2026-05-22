@@ -1,11 +1,26 @@
 /**
- * parser.js — Babel-based AST Parser (User Tool Layer)
+ * parser.js — Babel-based AST Parser v3.5 — Deep Semantic Extraction
  *
  * Parses .js, .jsx, .ts, .tsx files with @babel/parser + @babel/traverse.
- * Extracts fine-grained symbols (functions, components, hooks, classes, etc.)
- * and relationships (imports, calls, JSX usage, API calls).
+ * Extracts fine-grained symbols AND deep semantic relationships:
  *
- * Outputs to the Storage backend (SQLite) instead of a flat JSON.
+ * NEW in v3.5:
+ *   - React Navigation detection (navigate, push, goBack, useNavigation, Stack.Screen)
+ *   - Auth pattern detection (useAuth, isAuthenticated, ProtectedRoute, AuthContext, token)
+ *   - React Context detection (createContext, useContext, XxxProvider)
+ *   - State management detection (createSlice, createStore, useStore, useSelector, useDispatch, zustand create)
+ *   - Form handling detection (useForm, handleSubmit, validate, onChange, Formik)
+ *   - Error boundary detection (componentDidCatch, ErrorBoundary)
+ *   - WebSocket / real-time detection (WebSocket, socket.io, useWebSocket)
+ *   - Local storage detection (AsyncStorage, SecureStore, localStorage, mmkv)
+ *   - Permission detection (checkPermission, requestPermission)
+ *   - Deep link detection (Linking.openURL, useURL, deepLink)
+ *   - Push notification detection (PushNotification, registerForPushNotifications)
+ *   - Environment variable detection (process.env)
+ *   - Route/screen definition detection (Stack.Screen name=, Tab.Screen name=)
+ *   - Middleware detection (app.use, router.use)
+ *   - Event emitter detection (emit, on, addEventListener)
+ *   - richer metadata on every node and edge
  */
 
 const fs = require('fs');
@@ -29,6 +44,9 @@ const STORE_PATTERNS    = [/\/store?s?\//i, /\/state\//i, /\/redux\//i, /\/zusta
 const SERVICE_PATTERNS  = [/\/services?\//i, /\/lib\//i, /\/utils?\//i, /\/helpers?\//i, /(service|client|helper)\.(js|jsx|ts|tsx)$/i];
 const API_PATTERNS      = [/\/api\//i, /\/api\./i, /(api|endpoint|http)\.(js|jsx|ts|tsx)$/i];
 const COMPONENT_PATTERNS = [/\/components?\//i];
+const NAVIGATION_PATTERNS = [/\/navigation\//i, /\/navigators?\//i, /\/routing\//i, /(navigation|navigator|router)\.(js|jsx|ts|tsx)$/i];
+const CONTEXT_PATTERNS  = [/\/contexts?\//i, /\/providers?\//i, /(context|provider)\.(js|jsx|ts|tsx)$/i];
+const MIDDLEWARE_PATTERNS = [/\/middleware\//i, /\/middlewares?\//i, /middleware\.(js|jsx|ts|tsx)$/i];
 
 function nodeId(filePath, symbolName) {
   return crypto.createHash('md5').update(`${filePath}::${symbolName}`).digest('hex').slice(0, 12);
@@ -46,9 +64,16 @@ function endpointNodeId(method, url) {
   return 'ep:' + crypto.createHash('md5').update(`${method}:${url}`).digest('hex').slice(0, 10);
 }
 
+function routeNodeId(routeName) {
+  return 'route:' + crypto.createHash('md5').update(routeName).digest('hex').slice(0, 10);
+}
+
 function inferNodeType(filePath, exports) {
   const normalized = filePath.replace(/\\/g, '/');
   if (SCREEN_PATTERNS.some(p => p.test(normalized))) return 'screen';
+  if (NAVIGATION_PATTERNS.some(p => p.test(normalized))) return 'service';
+  if (CONTEXT_PATTERNS.some(p => p.test(normalized))) return 'store';
+  if (MIDDLEWARE_PATTERNS.some(p => p.test(normalized))) return 'service';
   const hasHookExport = exports.some(e => /^use[A-Z]/.test(e));
   if (HOOK_PATTERNS.some(p => p.test(normalized)) || hasHookExport) return 'hook';
   if (STORE_PATTERNS.some(p => p.test(normalized))) return 'store';
@@ -93,6 +118,130 @@ function discoverFiles(rootDir) {
   }
   walk(rootDir);
   return files;
+}
+
+// ──────────── Semantic Tagging Helpers ────────────
+
+function tagNode(node, tags) {
+  if (!node.metadata) node.metadata = {};
+  if (!node.metadata.tags) node.metadata.tags = [];
+  for (const tag of tags) {
+    if (!node.metadata.tags.includes(tag)) node.metadata.tags.push(tag);
+  }
+}
+
+function tagEdge(edge, tags) {
+  if (!edge.metadata) edge.metadata = {};
+  if (!edge.metadata.tags) edge.metadata.tags = [];
+  for (const tag of tags) {
+    if (!edge.metadata.tags.includes(tag)) edge.metadata.tags.push(tag);
+  }
+}
+
+// Detect semantic role from name patterns
+function detectSemanticRole(name, kind) {
+  const roles = [];
+  const n = name.toLowerCase();
+
+  // Auth roles
+  if (/^(login|signin|signup|register|logout|signout|authenticate|forgotpassword|resetpassword|changepassword|verifyotp|verifyemail|refreshtoken|useauth|useisauthenticated|authprovider|authcontext|protectedroute|authguard|authservice|authslice|authreducer|authstore|credential|identityserver|oauth|saml|sso|twofactor|mfa|totp)$/i.test(name)) {
+    roles.push('auth');
+  }
+  if (/isauthenticated|isloggedin|isauth|haspermission|hasrole|cantoken|tokenexpired|isexpired/i.test(name)) {
+    roles.push('auth-check');
+  }
+  if (/token|accesstoken|refreshtoken|idtoken|bearertoken|jwt|jwttoken/i.test(name)) {
+    roles.push('auth-token');
+  }
+
+  // Navigation roles
+  if (/^(navigation|navigator|useNavigation|useRoute|useFocusEffect|useIsFocused|Stack|Tab|Drawer|NavigationContainer|Link|DeepLink|useLinking|useURL|Linking)$/i.test(name)) {
+    roles.push('navigation');
+  }
+  if (/^(navigate|push|replace|goBack|pop|reset|navigateAndReset|openDrawer|closeDrawer|jumpTo)$/i.test(name)) {
+    roles.push('nav-action');
+  }
+
+  // State management roles
+  if (/^(createStore|configureStore|createSlice|createReducer|createAction|createSelector|create|useStore|useSelector|useDispatch|useReducer|Provider|connect|mapStateToProps|mapDispatchToProps|combineReducers|applyMiddleware|createContext|useContext)$/i.test(name)) {
+    roles.push('state');
+  }
+  if (/dispatch|setstate|set\w+|update\w+|mutate|action$/i.test(name)) {
+    roles.push('state-mutation');
+  }
+
+  // Form roles
+  if (/^(useForm|useField|useFormik|Formik|Form|Field|useController|useFieldArray|handleSubmit|validate|onSubmit|onChange|onBlur|onFocus|setFieldValue|setFieldError|setFieldTouched|resetForm|validateForm|isSubmitting|isValid|isDirty|touched|errors)$/i.test(name)) {
+    roles.push('form');
+  }
+  if (/^(FormikForm|ReactHookForm|FormControl|FormGroup|FormBuilder|InputField|TextField|SelectField|CheckboxField|RadioField)$/i.test(name)) {
+    roles.push('form-component');
+  }
+
+  // Error handling roles
+  if (/^(ErrorBoundary|componentDidCatch|catchError|handleError|reportError|logError|errorHandler|errorService|errorReporter|ErrorFallback|ErrorScreen|ErrorMessage)$/i.test(name)) {
+    roles.push('error');
+  }
+
+  // Storage roles
+  if (/^(AsyncStorage|SecureStore|localStorage|sessionStorage|MMKV|useMMKV|useStorage|getItem|setItem|removeItem|clearAll|multiGet|multiSet|persistor|persistConfig|rehydrate)$/i.test(name)) {
+    roles.push('storage');
+  }
+  if (/secure|encrypted|sensitive|secret|credential|password/i.test(name)) {
+    roles.push('secure-storage');
+  }
+
+  // Permission roles
+  if (/^(checkPermission|requestPermission|usePermission|hasPermission|PermissionDenied|PermissionGranted|useCameraPermission|useLocationPermission|useNotificationPermission|authorize|requestAccess)$/i.test(name)) {
+    roles.push('permission');
+  }
+
+  // Notification roles
+  if (/^(PushNotification|registerForPushNotifications|usePushNotification|NotificationService|registerNotification|onNotification|notificationListener|RemoteMessage|FCM|APNS|OneSignal|Notifee)$/i.test(name)) {
+    roles.push('notification');
+  }
+
+  // Analytics roles
+  if (/^(analytics|track|trackEvent|logEvent|identify|screenView|pageView|useAnalytics|AnalyticsService|FirebaseAnalytics|Mixpanel|Amplitude|Segment)$/i.test(name)) {
+    roles.push('analytics');
+  }
+
+  // WebSocket / Real-time roles
+  if (/^(WebSocket|socket\.io|useWebSocket|useSocket|connectSocket|disconnectSocket|onMessage|sendMessage|subscribe|unsubscribe|realtime|liveData|stream)$/i.test(name)) {
+    roles.push('realtime');
+  }
+
+  // i18n / localization roles
+  if (/^(useTranslation|i18n|t\(|translate|localize|formatMessage|FormattedMessage|LanguageProvider|setLocale|getLocale)$/i.test(name)) {
+    roles.push('i18n');
+  }
+
+  // Theme roles
+  if (/^(ThemeProvider|useTheme|useColorScheme|ThemeContext|darkMode|toggleTheme|createTheme|makeStyles|useStyles|styled|useStyled)$/i.test(name)) {
+    roles.push('theme');
+  }
+
+  // Deep link roles
+  if (/^(Linking|openURL|canOpenURL|useURL|useLinking|deepLink|universalLink|addEventListener|url|getInitialURL)$/i.test(name)) {
+    roles.push('deep-link');
+  }
+
+  // Middleware roles
+  if (/^(middleware|app\.use|router\.use|useMiddleware|withMiddleware|compose|applyMiddleware)$/i.test(name)) {
+    roles.push('middleware');
+  }
+
+  // Cache roles
+  if (/^(cache|useCache|cacheManager|invalidateCache|clearCache|revalidate|staleWhileRevalidate|SWR|useSWR|useSWRInfinite)$/i.test(name)) {
+    roles.push('cache');
+  }
+
+  // Testing roles
+  if (/^(mock|jest|describe|it|test|expect|beforeEach|afterEach|beforeAll|afterAll|spyOn|fn|render|screen|fireEvent|waitFor)$/i.test(name)) {
+    roles.push('test');
+  }
+
+  return roles;
 }
 
 // ──────────── AST Analysis ────────────
@@ -142,14 +291,15 @@ function analyzeFile(filePath, rootDir, storage) {
   const exports = [];
   const nodes = [];
   const edges = [];
-  const exportToNodeId = new Map(); // exportName → nodeId
+  const exportToNodeId = new Map();
+  const importMap = new Map(); // localName → { source, imported }
   let currentFunction = null;
   const functionStack = [];
 
   const fid = fileNodeId(relativePath);
 
   // Create file node
-  nodes.push({
+  const fileNodeObj = {
     id: fid,
     type: 'file',
     name: path.basename(filePath),
@@ -163,12 +313,38 @@ function analyzeFile(filePath, rootDir, storage) {
     is_async: 0,
     is_static: 0,
     signature: null,
-    metadata: { ext, language },
-  });
+    metadata: { ext, language, tags: [] },
+  };
+
+  // Pre-scan source for semantic file-level tags
+  const srcLower = source.toLowerCase();
+  if (/login|signin|signup|authenticate|authcontext|useauth|isauthenticated|token|session/i.test(source)) {
+    tagNode(fileNodeObj, ['auth-file']);
+  }
+  if (/navigation|navigate|useNavigation|Stack\.Screen|Tab\.Screen|useRoute/i.test(source)) {
+    tagNode(fileNodeObj, ['navigation-file']);
+  }
+  if (/createStore|createSlice|useSelector|useDispatch|useStore|zustand|reducer/i.test(source)) {
+    tagNode(fileNodeObj, ['state-file']);
+  }
+  if (/useForm|formik|handleSubmit|validate|onSubmit/i.test(source)) {
+    tagNode(fileNodeObj, ['form-file']);
+  }
+  if (/AsyncStorage|SecureStore|localStorage|MMKV|persist/i.test(source)) {
+    tagNode(fileNodeObj, ['storage-file']);
+  }
+  if (/WebSocket|socket\.io|useWebSocket|useSocket/i.test(source)) {
+    tagNode(fileNodeObj, ['realtime-file']);
+  }
+  if (/process\.env/i.test(source)) {
+    tagNode(fileNodeObj, ['env-usage']);
+  }
+
+  nodes.push(fileNodeObj);
 
   try {
     traverse(ast, {
-      // ── Imports ──
+      // ── Imports (enhanced with importMap tracking) ──
       ImportDeclaration(nodePath) {
         const src = nodePath.node.source.value;
         const specs = nodePath.node.specifiers.map(spec => {
@@ -181,29 +357,46 @@ function analyzeFile(filePath, rootDir, storage) {
           return null;
         }).filter(Boolean);
 
+        // Track in importMap for cross-file resolution
+        for (const spec of specs) {
+          importMap.set(spec.local, { source: src, imported: spec.imported });
+        }
+
         const resolvedPath = resolveImportPath(src, filePath, rootDir);
         const relResolved = resolvedPath ? safeRelative(resolvedPath, rootDir) : null;
 
+        const edgeTags = [];
+        // Tag auth-related imports
+        if (/auth|login|signin|session|token|credential|oauth/i.test(src)) edgeTags.push('auth-import');
+        if (/navigation|navigator|routing|router/i.test(src)) edgeTags.push('navigation-import');
+        if (/store|state|redux|zustand|reducer|slice/i.test(src)) edgeTags.push('state-import');
+        if (/form|formik|hookform/i.test(src)) edgeTags.push('form-import');
+        if (/api|http|axios|fetch|client|service/i.test(src)) edgeTags.push('api-import');
+
         if (relResolved) {
           const targetFileId = fileNodeId(relResolved);
-          edges.push({
+          const edge = {
             source: fid,
             target: targetFileId,
             kind: 'import',
             label: specs.map(s => s.imported).join(', '),
             line: nodePath.node.loc?.start?.line,
-          });
+          };
+          if (edgeTags.length) tagEdge(edge, edgeTags);
+          edges.push(edge);
         } else if (!src.startsWith('.')) {
           const pkgName = src.split('/')[0];
           const pkgId = pkgNodeId(pkgName);
-          edges.push({
+          const edge = {
             source: fid,
             target: pkgId,
             kind: 'external',
             label: specs.map(s => s.imported).join(', '),
             line: nodePath.node.loc?.start?.line,
             metadata: { package: src },
-          });
+          };
+          if (edgeTags.length) tagEdge(edge, edgeTags);
+          edges.push(edge);
         }
       },
 
@@ -236,7 +429,7 @@ function analyzeFile(filePath, rootDir, storage) {
         }
       },
 
-      // ── Function declarations ──
+      // ── Function declarations (enhanced with semantic roles) ──
       FunctionDeclaration: {
         enter(nodePath) {
           const name = nodePath.node.id?.name;
@@ -247,7 +440,7 @@ function analyzeFile(filePath, rootDir, storage) {
           const isHook = /^use[A-Z]/.test(name);
           const nId = nodeId(relativePath, name);
 
-          nodes.push({
+          const nodeObj = {
             id: nId,
             type: isComponent ? 'component' : (isHook ? 'hook' : 'function'),
             name,
@@ -259,11 +452,15 @@ function analyzeFile(filePath, rootDir, storage) {
             is_exported: exports.includes(name) ? 1 : 0,
             is_async: isAsync,
             signature: null,
-          });
+            metadata: { tags: [] },
+          };
 
-          // Containment edge: file → function
+          // Detect semantic roles
+          const roles = detectSemanticRole(name, 'function');
+          if (roles.length) tagNode(nodeObj, roles);
+
+          nodes.push(nodeObj);
           edges.push({ source: fid, target: nId, kind: 'contains', line });
-
           if (exports.includes(name)) exportToNodeId.set(name, nId);
 
           functionStack.push(currentFunction);
@@ -275,7 +472,7 @@ function analyzeFile(filePath, rootDir, storage) {
         },
       },
 
-      // ── Variable declarations (arrow functions, const) ──
+      // ── Variable declarations (enhanced with semantic roles) ──
       VariableDeclarator(nodePath) {
         if (!t.isIdentifier(nodePath.node.id)) return;
         const name = nodePath.node.id.name;
@@ -291,7 +488,7 @@ function analyzeFile(filePath, rootDir, storage) {
           const isAsync = (isArrowFn && init.async) || (isFnExpr && init.async) ? 1 : 0;
           const nId = nodeId(relativePath, name);
 
-          nodes.push({
+          const nodeObj = {
             id: nId,
             type: isComponent ? 'component' : (isHook ? 'hook' : 'function'),
             name,
@@ -303,14 +500,38 @@ function analyzeFile(filePath, rootDir, storage) {
             is_exported: exports.includes(name) ? 1 : 0,
             is_async: isAsync,
             signature: null,
-          });
+            metadata: { tags: [] },
+          };
 
+          const roles = detectSemanticRole(name, 'variable');
+          if (roles.length) tagNode(nodeObj, roles);
+
+          nodes.push(nodeObj);
           edges.push({ source: fid, target: nId, kind: 'contains', line });
           if (exports.includes(name)) exportToNodeId.set(name, nId);
+
+          // ── Detect createContext calls ──
+          if (isArrowFn || isFnExpr) {
+            // Check if the init body contains createContext
+            try {
+              traverse(init, {
+                CallExpression(cp) {
+                  const cc = cp.node.callee;
+                  if (t.isIdentifier(cc) && cc.name === 'createContext') {
+                    tagNode(nodeObj, ['context-creator']);
+                    // Extract context name from variable
+                    if (name.endsWith('Context') || name.includes('Context')) {
+                      tagNode(nodeObj, ['auth-context']);
+                    }
+                  }
+                }
+              }, { scope: nodePath.scope });
+            } catch {}
+          }
         } else {
-          // Regular variable
+          // Regular variable — check for special patterns
           const nId = nodeId(relativePath, `var:${name}`);
-          nodes.push({
+          const nodeObj = {
             id: nId,
             type: 'variable',
             name,
@@ -319,20 +540,57 @@ function analyzeFile(filePath, rootDir, storage) {
             kind: 'variable',
             start_line: line,
             is_exported: exports.includes(name) ? 1 : 0,
-          });
+            metadata: { tags: [] },
+          };
+
+          const roles = detectSemanticRole(name, 'variable');
+          if (roles.length) tagNode(nodeObj, roles);
+
+          // Check for createContext assignment
+          if (init && t.isCallExpression(init) && t.isIdentifier(init.callee) && init.callee.name === 'createContext') {
+            tagNode(nodeObj, ['context-creator']);
+            if (/auth|user|session|token/i.test(name)) tagNode(nodeObj, ['auth-context']);
+          }
+
+          // Check for createSlice / createStore / zustand create
+          if (init && t.isCallExpression(init)) {
+            const callee = init.callee;
+            if (t.isIdentifier(callee)) {
+              if (callee.name === 'createSlice') tagNode(nodeObj, ['state-slice']);
+              if (callee.name === 'createStore' || callee.name === 'configureStore') tagNode(nodeObj, ['state-store']);
+              if (callee.name === 'create' && /store|slice|state/i.test(name)) tagNode(nodeObj, ['state-store']);
+            }
+            // zustand: create()(state => ...)
+            if (t.isCallExpression(callee) && t.isIdentifier(callee.callee) && callee.callee.name === 'create') {
+              tagNode(nodeObj, ['state-store']);
+            }
+          }
+
+          // Check for process.env
+          if (init && t.isMemberExpression(init)) {
+            if (t.isMemberExpression(init.object) &&
+                t.isIdentifier(init.object.object) && init.object.object.name === 'process' &&
+                t.isIdentifier(init.object.property) && init.object.property.name === 'env') {
+              tagNode(nodeObj, ['env-var']);
+              const envKey = t.isIdentifier(init.property) ? init.property.name : 'UNKNOWN';
+              nodeObj.metadata.envKey = envKey;
+            }
+          }
+
+          nodes.push(nodeObj);
           edges.push({ source: fid, target: nId, kind: 'contains', line });
           if (exports.includes(name)) exportToNodeId.set(name, nId);
         }
       },
 
-      // ── Class declarations ──
+      // ── Class declarations (enhanced) ──
       ClassDeclaration(nodePath) {
         const name = nodePath.node.id?.name;
         if (!name) return;
         const line = nodePath.node.loc?.start?.line;
         const nId = nodeId(relativePath, name);
 
-        nodes.push({
+        const nodeObj = {
           id: nId,
           type: 'class',
           name,
@@ -342,124 +600,318 @@ function analyzeFile(filePath, rootDir, storage) {
           start_line: line,
           end_line: nodePath.node.loc?.end?.line,
           is_exported: exports.includes(name) ? 1 : 0,
-        });
+          metadata: { tags: [] },
+        };
 
+        // Detect ErrorBoundary
+        if (/errorboundary|errorfallback/i.test(name)) tagNode(nodeObj, ['error']);
+
+        // Detect extends
+        if (nodePath.node.superClass) {
+          const superName = t.isIdentifier(nodePath.node.superClass) ? nodePath.node.superClass.name :
+            t.isMemberExpression(nodePath.node.superClass) && t.isIdentifier(nodePath.node.superClass.object) ?
+              `${nodePath.node.superClass.object.name}.${nodePath.node.superClass.property?.name || ''}` : null;
+
+          if (superName) {
+            if (/errorboundary|component/i.test(superName)) tagNode(nodeObj, ['react-component']);
+            edges.push({
+              source: nId,
+              target: superName,
+              kind: 'extends',
+              label: superName,
+              line,
+              metadata: { unresolved: true },
+            });
+          }
+        }
+
+        const roles = detectSemanticRole(name, 'class');
+        if (roles.length) tagNode(nodeObj, roles);
+
+        nodes.push(nodeObj);
         edges.push({ source: fid, target: nId, kind: 'contains', line });
         if (exports.includes(name)) exportToNodeId.set(name, nId);
 
-        // Check for extends
-        if (nodePath.node.superClass && t.isIdentifier(nodePath.node.superClass)) {
-          const superName = nodePath.node.superClass.name;
-          edges.push({
-            source: nId,
-            target: superName, // Will be resolved later
-            kind: 'extends',
-            label: superName,
-            line,
-            metadata: { unresolved: true },
-          });
-        }
+        // Check for componentDidCatch method
+        nodePath.node.body.body.forEach(member => {
+          if (t.isClassMethod(member) && t.isIdentifier(member.key) && member.key.name === 'componentDidCatch') {
+            tagNode(nodeObj, ['error']);
+          }
+        });
       },
 
-      // ── Call expressions ──
+      // ── Call expressions (MASSIVELY enhanced) ──
       CallExpression(nodePath) {
         const { callee, arguments: args } = nodePath.node;
         const line = nodePath.node.loc?.start?.line;
+        const callerId = currentFunction ? nodeId(relativePath, currentFunction) : null;
 
-        // fetch()
+        // ── fetch() ──
         if (t.isIdentifier(callee) && callee.name === 'fetch') {
           const method = extractMethodFromArgs(args);
           const url = extractUrlFromArgs(args);
           const epId = endpointNodeId(method || 'GET', url || 'unknown');
-          if (currentFunction) {
-            const callerId = nodeId(relativePath, currentFunction);
-            edges.push({
-              source: callerId,
-              target: epId,
-              kind: 'api_call',
+          if (callerId) {
+            const edge = {
+              source: callerId, target: epId, kind: 'api_call',
               label: `fetch ${method || 'GET'} ${url || ''}`.trim(),
-              line,
-              metadata: { type: 'fetch', method, url },
-            });
+              line, metadata: { type: 'fetch', method, url, tags: [] },
+            };
+            if (/auth|login|token|session|refresh/i.test(url || '')) tagEdge(edge, ['auth-api']);
+            if (/payment|charge|stripe|order/i.test(url || '')) tagEdge(edge, ['payment-api']);
+            edges.push(edge);
           }
         }
 
-        // axios.get/post/etc.
+        // ── axios.get/post/etc. ──
         if (t.isMemberExpression(callee) && t.isIdentifier(callee.object) && callee.object.name === 'axios' && t.isIdentifier(callee.property)) {
           const method = callee.property.name.toUpperCase();
           const url = extractUrlFromArgs(args);
           const epId = endpointNodeId(method, url || 'unknown');
-          if (currentFunction) {
-            const callerId = nodeId(relativePath, currentFunction);
-            edges.push({
-              source: callerId,
-              target: epId,
-              kind: 'api_call',
+          if (callerId) {
+            const edge = {
+              source: callerId, target: epId, kind: 'api_call',
               label: `axios.${method.toLowerCase()} ${url || ''}`.trim(),
-              line,
-              metadata: { type: 'axios', method, url },
-            });
+              line, metadata: { type: 'axios', method, url, tags: [] },
+            };
+            if (/auth|login|token|session|refresh/i.test(url || '')) tagEdge(edge, ['auth-api']);
+            if (/payment|charge|stripe|order/i.test(url || '')) tagEdge(edge, ['payment-api']);
+            edges.push(edge);
           }
         }
 
-        // useQuery / useMutation
+        // ── useQuery / useMutation ──
         if (t.isIdentifier(callee) && (callee.name === 'useQuery' || callee.name === 'useMutation')) {
           const url = extractUrlFromArgs(args);
           const method = callee.name === 'useQuery' ? 'GET' : 'POST';
           const epId = endpointNodeId(method, url || 'unknown');
-          if (currentFunction) {
-            const callerId = nodeId(relativePath, currentFunction);
-            edges.push({
-              source: callerId,
-              target: epId,
-              kind: 'api_call',
+          if (callerId) {
+            const edge = {
+              source: callerId, target: epId, kind: 'api_call',
               label: `${callee.name} ${method} ${url || ''}`.trim(),
-              line,
-              metadata: { type: callee.name, method, url },
-            });
+              line, metadata: { type: callee.name, method, url, tags: [] },
+            };
+            if (/auth|login|token|session/i.test(url || '')) tagEdge(edge, ['auth-api']);
+            edges.push(edge);
           }
         }
 
-        // api.get/post (custom API clients)
+        // ── api.get/post (custom API clients) ──
         if (t.isMemberExpression(callee) && t.isIdentifier(callee.object) &&
             /api|client|http|apiService/i.test(callee.object.name) &&
             t.isIdentifier(callee.property) && /^(get|post|put|delete|patch)$/i.test(callee.property.name)) {
           const method = callee.property.name.toUpperCase();
           const url = extractUrlFromArgs(args);
           const epId = endpointNodeId(method, url || 'unknown');
-          if (currentFunction) {
-            const callerId = nodeId(relativePath, currentFunction);
-            edges.push({
-              source: callerId,
-              target: epId,
-              kind: 'api_call',
+          if (callerId) {
+            const edge = {
+              source: callerId, target: epId, kind: 'api_call',
               label: `${callee.object.name}.${callee.property.name} ${url || ''}`.trim(),
+              line, metadata: { type: 'apiClient', method, url, tags: [] },
+            };
+            if (/auth|login|token|session/i.test(url || '')) tagEdge(edge, ['auth-api']);
+            if (/payment|charge|stripe|order/i.test(url || '')) tagEdge(edge, ['payment-api']);
+            edges.push(edge);
+          }
+        }
+
+        // ── React Navigation calls ──
+        if (t.isMemberExpression(callee) && t.isIdentifier(callee.property)) {
+          const propName = callee.property.name;
+          // navigation.navigate('ScreenName'), navigation.push, etc.
+          if (/^(navigate|push|replace|reset|goBack|pop|popToTop|dismiss|jumpTo|openDrawer|closeDrawer|toggleDrawer)$/.test(propName)) {
+            const screenName = args.length > 0 && t.isStringLiteral(args[0]) ? args[0].value : null;
+            if (callerId) {
+              const targetId = screenName ? routeNodeId(screenName) : null;
+              if (targetId) {
+                const edge = {
+                  source: callerId, target: targetId, kind: 'navigates_to',
+                  label: `navigate → ${screenName}`,
+                  line,
+                  metadata: { action: propName, screenName, tags: ['navigation'] },
+                };
+                edges.push(edge);
+              }
+            }
+          }
+
+          // AsyncStorage methods
+          if (/^(getItem|setItem|removeItem|multiGet|multiSet|clear)$/.test(propName)) {
+            const objName = t.isIdentifier(callee.object) ? callee.object.name : '';
+            if (/AsyncStorage|SecureStore|localStorage|sessionStorage|MMKV|storage/i.test(objName) && callerId) {
+              const key = args.length > 0 && t.isStringLiteral(args[0]) ? args[0].value : null;
+              const action = propName === 'getItem' ? 'read' : propName === 'setItem' ? 'write' : propName === 'removeItem' ? 'delete' : 'multi';
+              const edge = {
+                source: callerId, target: `storage:${key || 'unknown'}`, kind: 'storage_access',
+                label: `${objName}.${propName}(${key || '...'})`,
+                line,
+                metadata: { type: 'storage', action, key, tags: [] },
+              };
+              if (/token|session|auth|credential/i.test(key || '')) tagEdge(edge, ['auth-storage']);
+              if (/secure|encrypted|password/i.test(key || objName)) tagEdge(edge, ['secure-storage']);
+              edges.push(edge);
+            }
+          }
+
+          // dispatch() calls
+          if (propName === 'dispatch' && t.isIdentifier(callee.object)) {
+            const objName = callee.object.name;
+            if (callerId) {
+              // Try to extract action type
+              let actionType = null;
+              if (args.length > 0 && t.isObjectExpression(args[0])) {
+                const typeProp = args[0].properties.find(p =>
+                  t.isObjectProperty(p) && t.isIdentifier(p.key) && p.key.name === 'type' && t.isStringLiteral(p.value)
+                );
+                if (typeProp) actionType = typeProp.value.value;
+              }
+              const edge = {
+                source: callerId,
+                target: nodeId(relativePath, `dispatch:${actionType || objName}`),
+                kind: 'dispatches',
+                label: actionType ? `dispatch({type: ${actionType}})` : `dispatch via ${objName}`,
+                line,
+                metadata: { actionType, tags: ['state-mutation'] },
+              };
+              edges.push(edge);
+            }
+          }
+
+          // socket.emit / socket.on
+          if (/^(emit|on|off|once)$/.test(propName) && t.isIdentifier(callee.object)) {
+            const objName = callee.object.name;
+            if (/socket|ws|connection|io|realtime/i.test(objName) && callerId) {
+              const eventName = args.length > 0 && t.isStringLiteral(args[0]) ? args[0].value : null;
+              edges.push({
+                source: callerId,
+                target: `event:${eventName || 'unknown'}`,
+                kind: propName === 'emit' ? 'emits_event' : 'subscribes_event',
+                label: `${objName}.${propName}(${eventName || '...'})`,
+                line,
+                metadata: { eventName, action: propName, tags: ['realtime'] },
+              });
+            }
+          }
+        }
+
+        // ── React Navigation: useNavigation() ──
+        if (t.isIdentifier(callee) && callee.name === 'useNavigation') {
+          if (callerId) {
+            tagNode(nodes.find(n => n.id === callerId) || {}, ['navigation-consumer']);
+          }
+        }
+
+        // ── useAuth / isAuthenticated hooks ──
+        if (t.isIdentifier(callee) && /^use(Auth|IsAuth|Session|Token|Credential|Login|Logout|User|Permission|Role)/i.test(callee.name)) {
+          if (callerId) {
+            tagNode(nodes.find(n => n.id === callerId) || {}, ['auth-consumer']);
+          }
+        }
+
+        // ── useSelector / useDispatch ──
+        if (t.isIdentifier(callee) && (callee.name === 'useSelector' || callee.name === 'useDispatch')) {
+          if (callerId) {
+            tagNode(nodes.find(n => n.id === callerId) || {}, ['state-consumer']);
+          }
+        }
+
+        // ── useForm / Formik hooks ──
+        if (t.isIdentifier(callee) && /^(useForm|useFormik|useField|useController|useFieldArray)$/i.test(callee.name)) {
+          if (callerId) {
+            tagNode(nodes.find(n => n.id === callerId) || {}, ['form-consumer']);
+          }
+        }
+
+        // ── useContext ──
+        if (t.isIdentifier(callee) && callee.name === 'useContext') {
+          const contextName = args.length > 0 && t.isIdentifier(args[0]) ? args[0].name : null;
+          if (callerId && contextName) {
+            const edge = {
+              source: callerId,
+              target: nodeId(relativePath, contextName),
+              kind: 'uses_context',
+              label: `useContext(${contextName})`,
               line,
-              metadata: { type: 'apiClient', method, url },
+              metadata: { contextName, tags: [] },
+            };
+            if (/auth|user|session|token/i.test(contextName)) tagEdge(edge, ['auth-context-usage']);
+            edges.push(edge);
+          }
+        }
+
+        // ── createContext ──
+        if (t.isIdentifier(callee) && callee.name === 'createContext') {
+          // Already handled in VariableDeclarator, but tag the file
+          tagNode(fileNodeObj, ['context-creator-file']);
+        }
+
+        // ── Linking.openURL (deep links) ──
+        if (t.isMemberExpression(callee) && t.isIdentifier(callee.object) && callee.object.name === 'Linking' &&
+            t.isIdentifier(callee.property) && callee.property.name === 'openURL') {
+          const url = args.length > 0 && t.isStringLiteral(args[0]) ? args[0].value : null;
+          if (callerId) {
+            edges.push({
+              source: callerId, target: `deeplink:${url || 'unknown'}`, kind: 'deep_link',
+              label: `Linking.openURL(${url || '...'})`,
+              line,
+              metadata: { url, tags: ['deep-link'] },
             });
           }
         }
 
-        // General function call tracking
+        // ── Permission requests ──
+        if (t.isMemberExpression(callee) && t.isIdentifier(callee.property) &&
+            /^(request|check|ask|authorize)/i.test(callee.property.name)) {
+          if (callerId) {
+            tagNode(nodes.find(n => n.id === callerId) || {}, ['permission-request']);
+          }
+        }
+
+        // ── Analytics tracking ──
+        if (t.isIdentifier(callee) && /^(track|logEvent|identify|screenView|pageView|reportAnalytics)$/i.test(callee.name)) {
+          if (callerId) {
+            const eventName = args.length > 0 && t.isStringLiteral(args[0]) ? args[0].value : null;
+            edges.push({
+              source: callerId, target: `analytics:${eventName || 'unknown'}`, kind: 'tracks_event',
+              label: `${callee.name}(${eventName || '...'})`,
+              line,
+              metadata: { eventName, tags: ['analytics'] },
+            });
+          }
+        }
+
+        // ── Notification registration ──
+        if (t.isIdentifier(callee) && /registerForPush|requestNotification|usePushNotification/i.test(callee.name)) {
+          if (callerId) {
+            tagNode(nodes.find(n => n.id === callerId) || {}, ['notification-consumer']);
+          }
+        }
+
+        // ── General function call tracking ──
         if (t.isIdentifier(callee) && currentFunction) {
           const calleeName = callee.name;
           if (calleeName && calleeName !== 'require' && calleeName !== 'fetch' && calleeName !== 'axios' &&
               !calleeName.startsWith('_') && calleeName.length > 1 &&
-              !/^(console|Math|JSON|Object|Array|String|Number|Boolean|Date|Promise|React|process|window|document|parseInt|parseFloat|isNaN|setTimeout|setInterval|clearTimeout|clearInterval)$/.test(calleeName)) {
-            const callerId = nodeId(relativePath, currentFunction);
-            const calleeId = nodeId(relativePath, calleeName);
-            edges.push({
-              source: callerId,
-              target: calleeId,
+              !/^(console|Math|JSON|Object|Array|String|Number|Boolean|Date|Promise|React|process|window|document|parseInt|parseFloat|isNaN|setTimeout|setInterval|clearTimeout|clearInterval|useNavigation|useAuth|useSelector|useDispatch|useContext|useForm|useFormik|useField|useQuery|useMutation|createContext|createSlice|createStore|navigate|push|replace|goBack|getItem|setItem|dispatch|track|logEvent|useCallback|useMemo|useEffect|useRef|useState|useReducer)$/.test(calleeName)) {
+            const callerFnId = nodeId(relativePath, currentFunction);
+            const calleeFnId = nodeId(relativePath, calleeName);
+            const edge = {
+              source: callerFnId,
+              target: calleeFnId,
               kind: 'call',
               label: `${currentFunction} → ${calleeName}`,
               line,
-            });
+              metadata: { tags: [] },
+            };
+            // Auto-tag call edges by semantic role
+            const calleeRoles = detectSemanticRole(calleeName, 'call');
+            if (calleeRoles.length) tagEdge(edge, calleeRoles.map(r => `calls-${r}`));
+            edges.push(edge);
           }
         }
       },
 
-      // ── JSX elements ──
+      // ── JSX elements (enhanced with Provider/Screen detection) ──
       JSXOpeningElement(nodePath) {
         const nameNode = nodePath.node.name;
         let componentName = null;
@@ -479,15 +931,69 @@ function analyzeFile(filePath, rootDir, storage) {
 
         if (componentName && /^[A-Z]/.test(componentName)) {
           const parentId = currentFunction ? nodeId(relativePath, currentFunction) : fid;
-          // Target: try to find the component's node ID via exports map, otherwise use name-based ID
           const targetId = exportToNodeId.get(componentName) || nodeId(relativePath, componentName);
-          edges.push({
+          const edge = {
             source: parentId,
             target: targetId,
             kind: 'jsx',
             label: `<${componentName} />`,
             line: nodePath.node.loc?.start?.line,
-          });
+            metadata: { tags: [] },
+          };
+
+          // Detect Provider usage (Context)
+          if (/Provider$/.test(componentName)) {
+            tagEdge(edge, ['provides-context']);
+            if (/Auth|User|Session|Token/i.test(componentName)) tagEdge(edge, ['auth-provider']);
+          }
+
+          // Detect NavigationContainer / Stack.Screen / Tab.Screen
+          if (/NavigationContainer|Stack|Tab|Drawer/.test(componentName)) {
+            tagEdge(edge, ['navigation-component']);
+          }
+
+          // Detect Screen components with name prop
+          if (/Screen$/.test(componentName)) {
+            const nameAttr = nodePath.node.attributes?.find(a =>
+              t.isJSXAttribute(a) && t.isJSXIdentifier(a.name) && a.name.name === 'name' && t.isStringLiteral(a.value)
+            );
+            if (nameAttr) {
+              const screenName = nameAttr.value.value;
+              const routeId = routeNodeId(screenName);
+              edges.push({
+                source: parentId, target: routeId, kind: 'defines_route',
+                label: `<${componentName} name="${screenName}" />`,
+                line: nodePath.node.loc?.start?.line,
+                metadata: { screenName, tags: ['navigation'] },
+              });
+            }
+          }
+
+          // Detect ErrorBoundary
+          if (/ErrorBoundary|ErrorFallback/i.test(componentName)) {
+            tagEdge(edge, ['error-boundary']);
+          }
+
+          // Detect ProtectedRoute / AuthGuard
+          if (/ProtectedRoute|AuthGuard|PrivateRoute|RequireAuth|AuthenticatedRoute/i.test(componentName)) {
+            tagEdge(edge, ['auth-guard']);
+          }
+
+          edges.push(edge);
+        }
+      },
+
+      // ── JSX Attributes (extract route params, event handlers) ──
+      JSXAttribute(nodePath) {
+        const name = nodePath.node.name?.name;
+        // Detect onPress handlers that navigate
+        if (name === 'onPress' && t.isJSXExpressionContainer(nodePath.node.value)) {
+          const expr = nodePath.node.value.expression;
+          if (t.isCallExpression(expr) && t.isMemberExpression(expr.callee)) {
+            if (t.isIdentifier(expr.callee.property) && /^(navigate|push|replace|goBack)$/.test(expr.callee.property.name)) {
+              // This is a navigation trigger from JSX
+            }
+          }
         }
       },
 
@@ -535,7 +1041,7 @@ function analyzeFile(filePath, rootDir, storage) {
   const fileNode = nodes.find(n => n.id === fid);
   if (fileNode) fileNode.type = fileType;
 
-  // Create endpoint and package nodes for edges
+  // Create extra nodes for edge targets
   const extraNodes = [];
   const seenIds = new Set(nodes.map(n => n.id));
 
@@ -543,8 +1049,7 @@ function analyzeFile(filePath, rootDir, storage) {
     if (!seenIds.has(edge.target)) {
       if (edge.target.startsWith('pkg:')) {
         extraNodes.push({
-          id: edge.target,
-          type: 'package',
+          id: edge.target, type: 'package',
           name: edge.target.replace('pkg:', ''),
           file_path: edge.target.replace('pkg:', ''),
           qualified_name: edge.metadata?.package || edge.target.replace('pkg:', ''),
@@ -553,13 +1058,60 @@ function analyzeFile(filePath, rootDir, storage) {
       } else if (edge.target.startsWith('ep:')) {
         const meta = edge.metadata || {};
         extraNodes.push({
-          id: edge.target,
-          type: 'endpoint',
+          id: edge.target, type: 'endpoint',
           name: `${meta.method || ''} ${meta.url || ''}`.trim() || edge.target,
           file_path: 'external',
           qualified_name: `API::${meta.method || 'GET'} ${meta.url || ''}`.trim(),
-          kind: 'endpoint',
-          metadata: meta,
+          kind: 'endpoint', metadata: meta,
+        });
+      } else if (edge.target.startsWith('route:')) {
+        const meta = edge.metadata || {};
+        extraNodes.push({
+          id: edge.target, type: 'screen',
+          name: meta.screenName || edge.target,
+          file_path: 'route-definition',
+          qualified_name: `Route::${meta.screenName || edge.target}`,
+          kind: 'route', metadata: meta,
+        });
+      } else if (edge.target.startsWith('storage:')) {
+        const key = edge.target.replace('storage:', '');
+        extraNodes.push({
+          id: edge.target, type: 'store',
+          name: `Storage:${key}`,
+          file_path: 'device-storage',
+          qualified_name: `Storage::${key}`,
+          kind: 'storage-key',
+          metadata: edge.metadata,
+        });
+      } else if (edge.target.startsWith('event:')) {
+        const eventName = edge.target.replace('event:', '');
+        extraNodes.push({
+          id: edge.target, type: 'service',
+          name: `Event:${eventName}`,
+          file_path: 'realtime',
+          qualified_name: `Event::${eventName}`,
+          kind: 'event',
+          metadata: edge.metadata,
+        });
+      } else if (edge.target.startsWith('deeplink:')) {
+        const url = edge.target.replace('deeplink:', '');
+        extraNodes.push({
+          id: edge.target, type: 'endpoint',
+          name: `DeepLink:${url}`,
+          file_path: 'external',
+          qualified_name: `DeepLink::${url}`,
+          kind: 'deeplink',
+          metadata: edge.metadata,
+        });
+      } else if (edge.target.startsWith('analytics:')) {
+        const eventName = edge.target.replace('analytics:', '');
+        extraNodes.push({
+          id: edge.target, type: 'service',
+          name: `Analytics:${eventName}`,
+          file_path: 'analytics',
+          qualified_name: `Analytics::${eventName}`,
+          kind: 'analytics-event',
+          metadata: edge.metadata,
         });
       }
       seenIds.add(edge.target);
@@ -582,6 +1134,8 @@ function extractUrlFromArgs(args) {
   if (t.isTemplateLiteral(first) && first.quasis.length > 0) {
     return first.quasis.map(q => q.value.cooked).join('${…}');
   }
+  // Handle URL as second arg for some APIs
+  if (args.length > 1 && t.isStringLiteral(args[1])) return args[1].value;
   return null;
 }
 
@@ -597,4 +1151,4 @@ function extractMethodFromArgs(args) {
   return 'GET';
 }
 
-module.exports = { analyzeFile, discoverFiles, inferNodeType, nodeId, fileNodeId, pkgNodeId, endpointNodeId, safeRelative };
+module.exports = { analyzeFile, discoverFiles, inferNodeType, nodeId, fileNodeId, pkgNodeId, endpointNodeId, routeNodeId, safeRelative, detectSemanticRole };

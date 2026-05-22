@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CodeGraph Visualizer v3</title>
+<title>CodeGraph Visualizer v3.5</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -230,7 +230,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
         <circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
         <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
       </svg>
-      CodeGraph v3
+      CodeGraph v3.5
     </div>
     <div class="header-stats" id="headerStats"></div>
   </div>
@@ -405,13 +405,13 @@ function renderTraceList(){
     const color=TRACE_COLORS[data.traces.indexOf(t)%TRACE_COLORS.length];
     const status=t.stats.completePaths>0?'complete':'partial';
     h+=`<li class="trace-item" data-tid="${t.traceId}" onclick="window._openTrace('${t.traceId}')">
-      <div class="ti-name"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}"></span>${t.name}</div>
+      <div class="ti-name"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}"></span>${t.icon||'🔍'} ${t.name}</div>
       <div class="ti-desc">${t.description||''}</div>
       <div class="ti-stats">
         <span><span class="ts-val">${t.stats.totalSteps}</span> steps</span>
-        <span><span class="ts-val">${t.stats.pathCount}</span> paths</span>
+        <span><span class="ts-val">${t.stats.subFlowCount}</span> sub-flows</span>
         <span><span class="ts-val">${t.stats.apiCallCount}</span> APIs</span>
-        <span style="color:${status==='complete'?'var(--green)':'var(--yellow)'}">${status}</span>
+        <span style="color:${t.stats.secureAccessCount>0?'var(--red)':'var(--t3)'}"><span class="ts-val">${t.stats.secureAccessCount}</span> secure</span>
       </div>
     </li>`;
   }
@@ -419,26 +419,44 @@ function renderTraceList(){
   tpBody.innerHTML=h;
 }
 
+let activeSubFlow=null;
+
 function renderTraceDetail(trace){
   const color=TRACE_COLORS[data.traces.indexOf(trace)%TRACE_COLORS.length];
   let h='<div class="trace-detail">';
   h+=`<div class="td-back" onclick="window._backToTraces()"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> All Traces</div>`;
-  h+=`<div class="td-title" style="color:${color}">${trace.name}</div>`;
+  h+=`<div class="td-title" style="color:${color}">${trace.icon||'🔍'} ${trace.name}</div>`;
   h+=`<div class="td-desc">${trace.description||''}</div>`;
   h+=`<div class="td-stats">
     <div class="td-stat"><div class="sv" style="color:${color}">${trace.stats.totalSteps}</div><div class="sl">Steps</div></div>
-    <div class="td-stat"><div class="sv">${trace.stats.filesTouched}</div><div class="sl">Files</div></div>
-    <div class="td-stat"><div class="sv" style="color:var(--orange)">${trace.stats.apiCallCount}</div><div class="sl">API Calls</div></div>
+    <div class="td-stat"><div class="sv">${trace.stats.uniqueFiles}</div><div class="sl">Files</div></div>
+    <div class="td-stat"><div class="sv" style="color:var(--orange)">${trace.stats.apiCallCount}</div><div class="sl">APIs</div></div>
+    <div class="td-stat"><div class="sv" style="color:var(--cyan)">${trace.stats.secureAccessCount}</div><div class="sl">Secure</div></div>
+    <div class="td-stat"><div class="sv" style="color:var(--purple)">${trace.stats.dispatchCount}</div><div class="sl">Dispatch</div></div>
+    <div class="td-stat"><div class="sv">${trace.stats.subFlowCount}/${trace.stats.totalSubFlows}</div><div class="sl">Sub-Flows</div></div>
   </div>`;
 
-  // Timeline
+  // Sub-flow tabs
+  if(trace.subFlows&&trace.subFlows.length>0){
+    h+='<div class="ds" style="margin-bottom:12px"><h4>Sub-Flows</h4><div style="display:flex;flex-wrap:wrap;gap:4px">';
+    for(const sf of trace.subFlows){
+      const sfColor=sf.stats.completePaths>0?'var(--green)':'var(--yellow)';
+      const isActive=activeSubFlow&&activeSubFlow.id===sf.id;
+      h+=`<span class="pill ${isActive?'active':'inactive'}" style="background:rgba(${isActive?'88,166,255':'139,148,158'},.12);color:${isActive?'var(--blue)':'var(--t2)'};border-color:${isActive?'rgba(88,166,255,.4)':'var(--bd3)'};cursor:pointer;font-size:9px;padding:3px 8px" onclick="window._selectSubFlow('${trace.traceId}','${sf.id}')">${sf.name} (${sf.stats.totalSteps})</span>`;
+    }
+    h+='</div></div>';
+  }
+
+  // Timeline (show active sub-flow or all)
+  const activeSpans=activeSubFlow?activeSubFlow.spans:[];
+  const activeNarrative=activeSubFlow?activeSubFlow.narrative:(trace.subFlows&&trace.subFlows.length>0?trace.subFlows.flatMap(sf=>sf.narrative):trace.narrative||[]);
   h+='<div class="trace-timeline">';
   const seen=new Set();
-  for(let i=0;i<trace.narrative.length;i++){
-    const step=trace.narrative[i];
+  for(let i=0;i<activeNarrative.length;i++){
+    const step=activeNarrative[i];
     if(seen.has(step.nodeId))continue;
     seen.add(step.nodeId);
-    const isLast=i===trace.narrative.length-1;
+    const isLast=i===activeNarrative.length-1;
     const dotClass=step.isEntry?'entry':step.isExit?'exit':(step.edgeKind==='api_call'?'api':step.type==='store'?'store':'');
     const dotColor=NC[step.type]||'var(--bd3)';
     const badges=[];
@@ -465,29 +483,57 @@ function renderTraceDetail(trace){
   }
   h+='</div>';
 
+  // Use active sub-flow's data or aggregate from all
+  const activeData=activeSubFlow||trace;
+  const activeApiCalls=activeSubFlow?activeSubFlow.apiCalls:trace.subFlows?trace.subFlows.flatMap(sf=>sf.apiCalls):trace.apiCalls||[];
+  const activeStoreAccess=activeSubFlow?activeSubFlow.storeAccess:trace.subFlows?trace.subFlows.flatMap(sf=>sf.storeAccess):trace.storeAccess||[];
+  const activeSecureAccess=activeSubFlow?activeSubFlow.secureAccess:trace.subFlows?trace.subFlows.flatMap(sf=>sf.secureAccess):[];
+  const activeDispatches=activeSubFlow?activeSubFlow.dispatches:trace.subFlows?trace.subFlows.flatMap(sf=>sf.dispatches):[];
+  const activePaths=activeSubFlow?activeSubFlow.paths:trace.subFlows?trace.subFlows.flatMap(sf=>sf.paths):trace.paths||[];
+
+  // Secure Storage
+  if(activeSecureAccess&&activeSecureAccess.length>0){
+    h+='<div class="ds" style="margin-top:16px"><h4 style="color:var(--red)">Secure Storage Access</h4><ul class="ds-list">';
+    for(const s of activeSecureAccess){
+      h+=`<li><span style="color:var(--red)">!</span><span class="nm">${s.action} ${s.key||''}</span><span class="lb">from ${s.fromName||s.from}</span></li>`;
+    }
+    h+='</ul></div>';
+  }
+
   // API Calls
-  if(trace.apiCalls&&trace.apiCalls.length>0){
-    h+='<div class="ds" style="margin-top:16px"><h4>API Calls</h4><ul class="ds-list">';
-    for(const api of trace.apiCalls){
-      h+=`<li><span class="api-badge get">${api.method||'GET'}</span><span class="nm">${api.url||'-'}</span><span class="lb">from ${api.fromName||api.from}</span></li>`;
+  if(activeApiCalls&&activeApiCalls.length>0){
+    h+='<div class="ds" style="margin-top:8px"><h4>API Calls</h4><ul class="ds-list">';
+    for(const api of activeApiCalls){
+      const isAuth=api.tags&&api.tags.includes('auth-api');
+      h+=`<li><span class="api-badge get">${api.method||'CALL'}</span><span class="nm">${api.url||'-'}</span><span class="lb">from ${api.fromName||api.from}${isAuth?' [AUTH]':''}</span></li>`;
     }
     h+='</ul></div>';
   }
 
   // Store Access
-  if(trace.storeAccess&&trace.storeAccess.length>0){
+  if(activeStoreAccess&&activeStoreAccess.length>0){
     h+='<div class="ds" style="margin-top:8px"><h4>Store Access</h4><ul class="ds-list">';
-    for(const s of trace.storeAccess){
-      h+=`<li><span style="color:var(--cyan)">+</span><span class="nm">${s.storeName||s.store}</span><span class="lb">from ${s.fromName||s.from}</span></li>`;
+    for(const s of activeStoreAccess){
+      const isSecure=s.tags&&s.tags.includes('secure-storage');
+      h+=`<li><span style="color:${isSecure?'var(--red)':'var(--cyan)'}">${isSecure?'!':'+'}</span><span class="nm">${s.storeName||s.store}</span><span class="lb">from ${s.fromName||s.from}${isSecure?' [SECURE]':''}</span></li>`;
+    }
+    h+='</ul></div>';
+  }
+
+  // Dispatches
+  if(activeDispatches&&activeDispatches.length>0){
+    h+='<div class="ds" style="margin-top:8px"><h4>State Dispatches</h4><ul class="ds-list">';
+    for(const d of activeDispatches){
+      h+=`<li><span style="color:var(--purple)">dispatch</span><span class="nm">${d.actionType||'action'}</span><span class="lb">from ${d.fromName||d.from}</span></li>`;
     }
     h+='</ul></div>';
   }
 
   // Paths
-  if(trace.paths&&trace.paths.length>0){
-    h+='<div class="ds" style="margin-top:8px"><h4>Discovered Paths ('+trace.paths.length+')</h4><ul class="ds-list">';
-    for(let pi=0;pi<Math.min(trace.paths.length,5);pi++){
-      const p=trace.paths[pi];
+  if(activePaths&&activePaths.length>0){
+    h+='<div class="ds" style="margin-top:8px"><h4>Discovered Paths ('+activePaths.length+')</h4><ul class="ds-list">';
+    for(let pi=0;pi<Math.min(activePaths.length,5);pi++){
+      const p=activePaths[pi];
       const entryN=nodeMap[p.entryId]||{name:p.entryId};
       const exitN=p.exitNodeId?(nodeMap[p.exitNodeId]||{name:p.exitNodeId}):null;
       h+=`<li><span class="arrow">${p.reachedExit?'>>':'>'}</span><span class="nm">${entryN.name}</span><span class="lb">-> ${exitN?exitN.name:'...'} (${p.steps.length} steps)${p.reachedExit?' complete':''}</span></li>`;
@@ -502,10 +548,20 @@ function renderTraceDetail(trace){
 window._openTrace=function(traceId){
   if(!data||!data.traces)return;
   activeTrace=data.traces.find(t=>t.traceId===traceId);
+  activeSubFlow=null;
   if(activeTrace){
     renderTraceDetail(activeTrace);
     highlightTraceOnGraph(activeTrace);
   }
+};
+
+window._selectSubFlow=function(traceId,subFlowId){
+  if(!data||!data.traces)return;
+  const trace=data.traces.find(t=>t.traceId===traceId);
+  if(!trace)return;
+  activeSubFlow=trace.subFlows.find(sf=>sf.id===subFlowId);
+  renderTraceDetail(trace);
+  if(activeSubFlow)highlightSubFlowOnGraph(activeSubFlow);
 };
 
 window._backToTraces=function(){
@@ -533,12 +589,16 @@ window._hlTraceNode=function(nodeId){
 function highlightTraceOnGraph(trace){
   if(!trace)return;
   const traceNodeIds=new Set();
-  for(const step of trace.narrative){
-    traceNodeIds.add(step.nodeId);
+  // Aggregate from all sub-flows
+  if(trace.subFlows){
+    for(const sf of trace.subFlows){
+      for(const span of sf.spans){traceNodeIds.add(span.nodeId);}
+      for(const step of sf.narrative){traceNodeIds.add(step.nodeId);}
+    }
   }
-  for(const span of trace.spans){
-    traceNodeIds.add(span.nodeId);
-  }
+  // Fallback for flat trace
+  for(const step of (trace.narrative||[])){traceNodeIds.add(step.nodeId);}
+  for(const span of (trace.spans||[])){traceNodeIds.add(span.nodeId);}
 
   _nodeGs?.selectAll('.node-c')
     .classed('trace-hl',d=>traceNodeIds.has(d.id))
@@ -546,6 +606,20 @@ function highlightTraceOnGraph(trace){
   _labels?.classed('trace-hl',d=>traceNodeIds.has(d.id)).classed('dim',d=>!traceNodeIds.has(d.id));
   _links?.classed('trace-hl',d=>traceNodeIds.has(d.source.id||d.source)&&traceNodeIds.has(d.target.id||d.target))
     .classed('dim',d=>!traceNodeIds.has(d.source.id||d.source)||!traceNodeIds.has(d.target.id||d.target));
+}
+
+function highlightSubFlowOnGraph(subFlow){
+  if(!subFlow)return;
+  const sfNodeIds=new Set();
+  for(const span of subFlow.spans)sfNodeIds.add(span.nodeId);
+  for(const step of subFlow.narrative)sfNodeIds.add(step.nodeId);
+
+  _nodeGs?.selectAll('.node-c')
+    .classed('trace-hl',d=>sfNodeIds.has(d.id))
+    .classed('dim',d=>!sfNodeIds.has(d.id));
+  _labels?.classed('trace-hl',d=>sfNodeIds.has(d.id)).classed('dim',d=>!sfNodeIds.has(d.id));
+  _links?.classed('trace-hl',d=>sfNodeIds.has(d.source.id||d.source)&&sfNodeIds.has(d.target.id||d.target))
+    .classed('dim',d=>!sfNodeIds.has(d.source.id||d.source)||!sfNodeIds.has(d.target.id||d.target));
 }
 
 function clearTraceHighlight(){
@@ -693,7 +767,8 @@ function renderGraph(){
   },1200);
 
   // Re-apply trace highlight if active
-  if(activeTrace)highlightTraceOnGraph(activeTrace);
+  if(activeSubFlow)highlightSubFlowOnGraph(activeSubFlow);
+  else if(activeTrace)highlightTraceOnGraph(activeTrace);
 }
 
 function applyFilters(){renderGraph();if(searchTerm)applySearch(searchTerm)}
@@ -759,13 +834,30 @@ function renderSP(d){
 
   // Traces containing this node
   if(data&&data.traces){
-    const containingTraces=data.traces.filter(t=>t.spans&&t.spans.some(s=>s.nodeId===d.id));
+    const containingTraces=[];
+    for(const t of data.traces){
+      const subFlowMatches=[];
+      if(t.subFlows){
+        for(const sf of t.subFlows){
+          if(sf.spans&&sf.spans.some(s=>s.nodeId===d.id)){
+            subFlowMatches.push(sf);
+          }
+        }
+      }
+      // Fallback for flat traces
+      if(!t.subFlows&&t.spans&&t.spans.some(s=>s.nodeId===d.id)){
+        containingTraces.push({trace:t,subFlow:null,span:t.spans.find(s=>s.nodeId===d.id)});
+      }
+      for(const sf of subFlowMatches){
+        containingTraces.push({trace:t,subFlow:sf,span:sf.spans.find(s=>s.nodeId===d.id)});
+      }
+    }
     if(containingTraces.length>0){
       h+=`<div class="ds"><h4>Workflow Traces (${containingTraces.length})</h4><ul class="ds-list">`;
-      for(const t of containingTraces){
-        const color=TRACE_COLORS[data.traces.indexOf(t)%TRACE_COLORS.length];
-        const span=t.spans.find(s=>s.nodeId===d.id);
-        h+=`<li onclick="window._openTrace('${t.traceId}')" style="cursor:pointer"><span style="color:${color}">+</span><span class="nm">${t.name}</span><span class="lb">${span.isEntry?'entry':span.isExit?'exit':span.edgeKind}</span></li>`;
+      for(const ct of containingTraces){
+        const color=TRACE_COLORS[data.traces.indexOf(ct.trace)%TRACE_COLORS.length];
+        const sfLabel=ct.subFlow?` / ${ct.subFlow.name}`:'';
+        h+=`<li onclick="window._openTrace('${ct.trace.traceId}')" style="cursor:pointer"><span style="color:${color}">+</span><span class="nm">${ct.trace.icon||'🔍'} ${ct.trace.name}${sfLabel}</span><span class="lb">${ct.span.isEntry?'entry':ct.span.isExit?'exit':ct.span.edgeKind}</span></li>`;
       }
       h+='</ul></div>';
     }
@@ -837,6 +929,7 @@ tpClose.onclick=()=>{
   tracePanel.classList.remove('open');
   traceToggleBtn.classList.remove('active');
   activeTrace=null;
+  activeSubFlow=null;
   clearTraceHighlight();
 };
 

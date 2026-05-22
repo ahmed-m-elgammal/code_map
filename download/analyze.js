@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 /**
- * analyze.js — Codebase Graph Analyzer v3.0
+ * analyze.js — Codebase Graph Analyzer v3.5
  *
- * Layered architecture:
+ * Layered architecture with deep semantic tracing:
  *   User Tools (this CLI + Tracer)
  *       ↓
  *   Code Helpers (convenience queries)
@@ -15,7 +15,7 @@
  *   Storage Backend (SQLite, WAL, FTS5)
  *
  * Usage:
- *   node analyze.js [path] [--json] [--full] [--stats-only] [--trace <id>]
+ *   node analyze.js [path] [--json] [--full] [--stats-only] [--trace <id>] [--traces] [--init-traces]
  */
 
 const path = require('path');
@@ -32,8 +32,6 @@ const { Tracer } = require('./lib/tracer');
 // ──── CLI args ────
 const args = process.argv.slice(2);
 const targetDir = args.find(a => !a.startsWith('--')) || process.cwd();
-const jsonOutput = args.includes('--json');
-const fullOutput = args.includes('--full');
 const statsOnly = args.includes('--stats-only');
 const traceIdx = args.indexOf('--trace');
 const traceId = traceIdx >= 0 ? args[traceIdx + 1] : null;
@@ -48,8 +46,8 @@ function main() {
 
   console.log('');
   console.log('  ╔═══════════════════════════════════════════════════════════╗');
-  console.log('  ║         Codebase Graph Analyzer v3.0                     ║');
-  console.log('  ║         Layered: Parse → Store → Graph → Query → Trace   ║');
+  console.log('  ║         Codebase Graph Analyzer v3.5                     ║');
+  console.log('  ║         Deep Semantic Analysis + Workflow Tracing         ║');
   console.log('  ╚═══════════════════════════════════════════════════════════╝');
   console.log('');
   console.log(`  Target:  ${rootDir}`);
@@ -88,7 +86,7 @@ function main() {
   }
 
   // ── Step 3: Parse and index ──
-  console.log('  Parsing with Babel -> storing in SQLite...');
+  console.log('  Parsing with Babel (deep semantic extraction)...');
   let indexed = 0, skipped = 0, errors = 0;
   const startTime = Date.now();
 
@@ -100,13 +98,13 @@ function main() {
   }
 
   const parseTime = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.log(`  Indexed: ${indexed}  Skipped (unchanged): ${skipped}  Errors: ${errors}  (${parseTime}s)`);
+  console.log(`  Indexed: ${indexed}  Skipped: ${skipped}  Errors: ${errors}  (${parseTime}s)`);
   console.log('');
 
   // ── Step 4: Compute metrics ──
   console.log('  Computing graph metrics...');
   storage.computeMetrics();
-  console.log('  Fan-in, fan-out, instability calculated');
+  console.log('  Done');
   console.log('');
 
   // ── Step 5: Build graph and run algorithms ──
@@ -118,30 +116,35 @@ function main() {
   const orphans = graph.getOrphans();
   const communities = graph.detectCommunities();
 
-  console.log(`  Cycles detected: ${cycles.length}`);
-  console.log(`  Orphan nodes: ${orphans.length}`);
-  console.log(`  Communities found: ${communities.length}`);
+  console.log(`  Cycles: ${cycles.length}  Orphans: ${orphans.length}  Communities: ${communities.length}`);
   console.log('');
 
   // ── Step 6: Run workflow tracing ──
-  console.log('  Running workflow tracing...');
+  console.log('  Running deep semantic workflow tracing...');
   const tracer = new Tracer(graph, storage);
   const traceResults = tracer.runAll(rootDir);
-  console.log(`  Traces discovered: ${traceResults.length}`);
+
+  let totalSubFlows = 0;
+  for (const t of traceResults) totalSubFlows += t.subFlows.length;
+  console.log(`  Traces discovered: ${traceResults.length} (${totalSubFlows} sub-flows)`);
   for (const t of traceResults) {
-    const status = t.stats.completePaths > 0 ? 'complete' : 'partial';
-    console.log(`    ${t.name}: ${t.stats.totalSteps} steps, ${t.stats.pathCount} paths (${status})`);
+    const sfNames = t.subFlows.map(sf => sf.name).join(', ');
+    console.log(`    ${t.icon || '🔍'} ${t.name}: ${t.subFlows.length} sub-flows (${t.stats.totalSteps} steps total)`);
   }
   console.log('');
 
   // ── Handle --traces (list only) ──
   if (listTraces) {
     console.log('  ╔═══════════════════════════════════════════════════════════╗');
-    console.log('  ║               Available Traces                            ║');
+    console.log('  ║               Available Workflow Traces                   ║');
     console.log('  ╠═══════════════════════════════════════════════════════════╣');
     for (const t of traceResults) {
-      console.log(`  ║  ${t.traceId.padEnd(20)} ${t.name.padEnd(35)}║`);
-      console.log(`  ║  ${''.padEnd(20)} ${t.stats.totalSteps} steps, ${t.stats.completePaths}/${t.stats.pathCount} complete paths${''.padEnd(10)}║`);
+      console.log(`  ║  ${t.icon || '🔍'} ${t.name.padEnd(40)}║`);
+      console.log(`  ║     ${t.stats.subFlowCount} sub-flows, ${t.stats.totalSteps} steps, ${t.stats.apiCallCount} APIs${''.padEnd(15)}║`);
+      for (const sf of t.subFlows) {
+        const status = sf.stats.completePaths > 0 ? 'complete' : 'partial';
+        console.log(`  ║       - ${sf.name.padEnd(36)} [${status}]║`);
+      }
     }
     console.log('  ╚═══════════════════════════════════════════════════════════╝');
     console.log('');
@@ -160,35 +163,61 @@ function main() {
 
     console.log('');
     console.log(`  ══════════════════════════════════════════════════════════`);
-    console.log(`  Trace: ${trace.name}`);
+    console.log(`  ${trace.icon || '🔍'} ${trace.name}`);
     console.log(`  ${trace.description}`);
     console.log(`  ══════════════════════════════════════════════════════════`);
     console.log('');
+    console.log(`  Overview: ${trace.stats.totalSteps} steps | ${trace.stats.uniqueFiles} files | ${trace.stats.apiCallCount} APIs | ${trace.stats.secureAccessCount} secure ops`);
+    console.log('');
 
-    // Print narrative
-    for (const step of trace.narrative) {
-      const indent = '  ' + '  '.repeat(step.depth);
-      const marker = step.isEntry ? '[START]' : step.isExit ? '[END]' : '';
-      const arrow = step.depth > 0 ? `  <- ${step.edgeKind}` : '';
-      console.log(`${indent}${marker} ${step.type}:${step.name} (${step.file_path})${arrow}`);
+    for (const sf of trace.subFlows) {
+      const status = sf.stats.completePaths > 0 ? 'COMPLETE' : 'PARTIAL';
+      console.log(`  ─── ${sf.name} [${status}] ───`);
+      console.log(`  ${sf.description}`);
+      console.log('');
+
+      for (const step of sf.narrative) {
+        const indent = '  ' + '  '.repeat(step.depth);
+        const marker = step.isEntry ? '[START]' : step.isExit ? '[END]' : '';
+        const arrow = step.depth > 0 ? `  <- ${step.edgeKind}` : '';
+        const tagStr = step.tags.length > 0 ? ` [${step.tags.join(',')}]` : '';
+        console.log(`${indent}${marker} ${step.type}:${step.name} (${step.file_path})${arrow}${tagStr}`);
+      }
+
+      if (sf.apiCalls.length > 0) {
+        console.log(`  API Calls:`);
+        for (const api of sf.apiCalls) {
+          const authTag = api.tags.includes('auth-api') ? ' [AUTH]' : '';
+          console.log(`    ${api.method || 'CALL'} ${api.url || '-'} (from ${api.fromName || api.from})${authTag}`);
+        }
+      }
+      if (sf.secureAccess.length > 0) {
+        console.log(`  Secure Storage Access:`);
+        for (const s of sf.secureAccess) {
+          console.log(`    ${s.action} key="${s.key}" (from ${s.fromName || s.from})`);
+        }
+      }
+      if (sf.dispatches.length > 0) {
+        console.log(`  State Dispatches:`);
+        for (const d of sf.dispatches) {
+          console.log(`    dispatch(${d.actionType || 'action'}) from ${d.fromName || d.from}`);
+        }
+      }
+      console.log('');
     }
 
-    console.log('');
-    console.log(`  Stats: ${trace.stats.totalSteps} steps | ${trace.stats.filesTouched} files | ${trace.stats.apiCallCount} API calls | ${trace.stats.storeAccessCount} store accesses`);
-    console.log(`  Paths: ${trace.stats.completePaths}/${trace.stats.pathCount} complete`);
-    console.log('');
     storage.close();
     process.exit(0);
   }
 
-  // ── Step 7: Build helpers and visualization data ──
+  // ── Step 7: Build visualization data ──
   console.log('  Building visualization data...');
   const helpers = new CodeHelpers(graph);
   const vizData = helpers.buildVisualizationData();
 
-  // Attach trace results to viz data
+  // Attach trace results
   vizData.traces = traceResults;
-  vizData.version = 3;
+  vizData.version = 3.5;
 
   // Write graph.json
   fs.writeFileSync(jsonPath, JSON.stringify(vizData, null, 2), 'utf-8');
@@ -209,6 +238,7 @@ function main() {
   console.log(`  ║  Orphan nodes:       ${String(orphans.length).padEnd(36)}║`);
   console.log(`  ║  Communities:        ${String(communities.length).padEnd(36)}║`);
   console.log(`  ║  Workflow traces:    ${String(traceResults.length).padEnd(36)}║`);
+  console.log(`  ║  Sub-flows:          ${String(totalSubFlows).padEnd(36)}║`);
   console.log('  ╠═══════════════════════════════════════════════════════════╣');
   console.log('  ║  Node types:                                             ║');
   for (const { type, count } of stats.nodeTypes) {
@@ -217,13 +247,13 @@ function main() {
   console.log('  ╠═══════════════════════════════════════════════════════════╣');
   console.log('  ║  Edge kinds:                                             ║');
   for (const { kind, count } of stats.edgeKinds) {
-    console.log(`  ║    ${kind.padEnd(14)} ${String(count).padEnd(35)}║`);
+    console.log(`  ║    ${kind.padEnd(18)} ${String(count).padEnd(32)}║`);
   }
   console.log('  ╠═══════════════════════════════════════════════════════════╣');
 
   // Hotspots
   const hotspots = helpers.findHotspots(5);
-  console.log('  ║  Top hotspots (most connected):                          ║');
+  console.log('  ║  Top hotspots:                                           ║');
   for (const hs of hotspots) {
     const name = hs.node.name || hs.node.id;
     console.log(`  ║    ${name.slice(0, 30).padEnd(14)} in:${String(hs.fanIn).padEnd(3)} out:${String(hs.fanOut).padEnd(3)} total:${String(hs.totalConnections).padEnd(6)}║`);
@@ -234,24 +264,11 @@ function main() {
     console.log('  ╠═══════════════════════════════════════════════════════════╣');
     console.log('  ║  Workflow Traces:                                        ║');
     for (const t of traceResults) {
-      const status = t.stats.completePaths > 0 ? 'complete' : 'partial';
-      console.log(`  ║    ${t.traceId.padEnd(16)} ${String(t.stats.totalSteps).padEnd(3)} steps, ${String(t.stats.pathCount).padEnd(2)} paths (${status.padEnd(8)})║`);
-    }
-  }
-
-  // Cycles
-  if (cycles.length > 0) {
-    console.log('  ╠═══════════════════════════════════════════════════════════╣');
-    console.log('  ║  Circular dependencies:                                  ║');
-    for (const cycle of cycles.slice(0, 5)) {
-      const names = cycle.map(id => {
-        const n = storage.getNode(id);
-        return n ? n.name || n.id : id;
-      });
-      console.log(`  ║    ${names.join(' -> ').slice(0, 50).padEnd(51)}║`);
-    }
-    if (cycles.length > 5) {
-      console.log(`  ║    ... and ${cycles.length - 5} more`);
+      console.log(`  ║  ${t.icon || '🔍'} ${t.name.padEnd(30)} ${String(t.subFlows.length).padEnd(2)} sub-flows${''.padEnd(10)}║`);
+      for (const sf of t.subFlows) {
+        const status = sf.stats.completePaths > 0 ? 'complete' : 'partial';
+        console.log(`  ║      ${sf.name.padEnd(32)} [${status.padEnd(7)}]║`);
+      }
     }
   }
 
@@ -260,13 +277,20 @@ function main() {
   console.log('  Done! Open visualizer.html and load graph.json to explore.');
   console.log('');
   console.log('  Tracing commands:');
-  console.log('    node analyze.js --traces              List all detected traces');
-  console.log('    node analyze.js --trace auth          Show auth flow details');
-  console.log('    node analyze.js --trace payment       Show payment flow details');
-  console.log('    node analyze.js --init-traces         Create .codegraph/traces.json');
+  console.log('    node analyze.js --traces              List all detected traces + sub-flows');
+  console.log('    node analyze.js --trace auth           Show auth flow (6 sub-flows)');
+  console.log('    node analyze.js --trace payment        Show payment flow');
+  console.log('    node analyze.js --trace navigation     Show navigation flow');
+  console.log('    node analyze.js --trace data-fetch     Show data fetching flow');
+  console.log('    node analyze.js --trace state          Show state management flow');
+  console.log('    node analyze.js --trace forms          Show form handling flow');
+  console.log('    node analyze.js --trace errors         Show error handling flow');
+  console.log('    node analyze.js --trace realtime       Show WebSocket flow');
+  console.log('    node analyze.js --trace permissions    Show permission flow');
+  console.log('    node analyze.js --trace notifications  Show push notification flow');
+  console.log('    node analyze.js --init-traces          Create .codegraph/traces.json');
   console.log('');
 
-  // Close storage
   storage.close();
 }
 
