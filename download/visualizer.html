@@ -3,1354 +3,582 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CodeGraph Visualizer</title>
+<title>CodeGraph Visualizer v2</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <style>
-  /* ─────────── Reset & Base ─────────── */
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg-primary:    #0d1117;
-    --bg-secondary:  #161b22;
-    --bg-tertiary:   #21262d;
-    --bg-hover:      #30363d;
-    --border:        #30363d;
-    --border-light:  #3d444d;
-    --text-primary:  #e6edf3;
-    --text-secondary:#8b949e;
-    --text-muted:    #6e7681;
-    --accent-blue:   #58a6ff;
-    --accent-green:  #3fb950;
-    --accent-purple: #bc8cff;
-    --accent-orange: #f0883e;
-    --accent-red:    #ff7b72;
-    --accent-cyan:   #56d4dd;
-    --accent-pink:   #f778ba;
-    --accent-yellow: #d29922;
-
-    --node-screen:    #58a6ff;
-    --node-component: #bc8cff;
-    --node-hook:      #56d4dd;
-    --node-store:     #f0883e;
-    --node-service:   #3fb950;
-    --node-api:       #ff7b72;
-    --node-file:      #8b949e;
-    --node-package:   #d29922;
-    --node-endpoint:  #f778ba;
-
-    --edge-import:    #58a6ff;
-    --edge-jsx:       #bc8cff;
-    --edge-api:       #ff7b72;
-    --edge-call:      #3fb950;
-    --edge-external:  #d29922;
-
-    --radius: 8px;
-    --shadow: 0 8px 32px rgba(0,0,0,.4);
-  }
-
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    height: 100vh;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* ─────────── Header ─────────── */
-  .header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 20px;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border);
-    z-index: 100;
-    flex-shrink: 0;
-  }
-
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-  }
-
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: -0.5px;
-  }
-
-  .logo svg { opacity: .85; }
-
-  .header-stats {
-    display: flex;
-    gap: 16px;
-    font-size: 12px;
-    color: var(--text-secondary);
-  }
-
-  .header-stats span {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .header-stats .num {
-    color: var(--text-primary);
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  /* ─────────── Drop Zone ─────────── */
-  .drop-zone-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(13,17,23,.92);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    transition: opacity .2s;
-  }
-
-  .drop-zone-overlay.hidden {
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .drop-zone-box {
-    border: 2px dashed var(--accent-blue);
-    border-radius: 16px;
-    padding: 60px 80px;
-    text-align: center;
-    background: var(--bg-secondary);
-    max-width: 500px;
-  }
-
-  .drop-zone-box h2 {
-    font-size: 22px;
-    margin-bottom: 8px;
-  }
-
-  .drop-zone-box p {
-    color: var(--text-secondary);
-    font-size: 14px;
-    margin-bottom: 20px;
-  }
-
-  .drop-zone-box .or {
-    color: var(--text-muted);
-    margin: 12px 0;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    border-radius: 6px;
-    border: 1px solid var(--border-light);
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all .15s;
-  }
-
-  .btn:hover { background: var(--bg-hover); border-color: var(--text-muted); }
-
-  .btn-primary {
-    background: #238636;
-    border-color: #2ea043;
-  }
-
-  .btn-primary:hover { background: #2ea043; }
-
-  /* ─────────── Toolbar ─────────── */
-  .toolbar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 20px;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-    flex-wrap: wrap;
-  }
-
-  .search-box {
-    position: relative;
-    flex-shrink: 0;
-  }
-
-  .search-box input {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 7px 12px 7px 32px;
-    color: var(--text-primary);
-    font-size: 13px;
-    width: 240px;
-    outline: none;
-    transition: border-color .15s;
-  }
-
-  .search-box input:focus { border-color: var(--accent-blue); }
-
-  .search-box input::placeholder { color: var(--text-muted); }
-
-  .search-box svg {
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-muted);
-    pointer-events: none;
-  }
-
-  .filter-pills {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    flex: 1;
-  }
-
-  .pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 4px 10px;
-    border-radius: 100px;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    border: 1.5px solid transparent;
-    transition: all .15s;
-    user-select: none;
-    text-transform: capitalize;
-  }
-
-  .pill .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  .pill.active { opacity: 1; }
-  .pill.inactive { opacity: .35; }
-
-  .pill[data-type="screen"]    { background: rgba(88,166,255,.15);  color: var(--node-screen);    border-color: rgba(88,166,255,.3); }
-  .pill[data-type="component"] { background: rgba(188,140,255,.15); color: var(--node-component); border-color: rgba(188,140,255,.3); }
-  .pill[data-type="hook"]      { background: rgba(86,212,221,.15);  color: var(--node-hook);      border-color: rgba(86,212,221,.3); }
-  .pill[data-type="store"]     { background: rgba(240,136,62,.15);  color: var(--node-store);     border-color: rgba(240,136,62,.3); }
-  .pill[data-type="service"]   { background: rgba(63,185,80,.15);   color: var(--node-service);   border-color: rgba(63,185,80,.3); }
-  .pill[data-type="api"]       { background: rgba(255,123,114,.15); color: var(--node-api);       border-color: rgba(255,123,114,.3); }
-  .pill[data-type="file"]      { background: rgba(139,148,158,.15); color: var(--node-file);      border-color: rgba(139,148,158,.3); }
-  .pill[data-type="package"]   { background: rgba(210,153,34,.15);  color: var(--node-package);   border-color: rgba(210,153,34,.3); }
-  .pill[data-type="endpoint"]  { background: rgba(247,120,186,.15); color: var(--node-endpoint);  border-color: rgba(247,120,186,.3); }
-
-  .edge-legend {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    font-size: 11px;
-    color: var(--text-secondary);
-    flex-shrink: 0;
-    margin-left: auto;
-  }
-
-  .edge-legend-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .edge-legend-line {
-    width: 20px;
-    height: 2px;
-  }
-
-  /* ─────────── Main Canvas ─────────── */
-  .main-area {
-    flex: 1;
-    position: relative;
-    overflow: hidden;
-  }
-
-  #graph-canvas {
-    width: 100%;
-    height: 100%;
-    cursor: grab;
-  }
-
-  #graph-canvas:active { cursor: grabbing; }
-
-  /* ─────────── Side Panel ─────────── */
-  .side-panel {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 380px;
-    height: 100%;
-    background: var(--bg-secondary);
-    border-left: 1px solid var(--border);
-    z-index: 50;
-    transform: translateX(100%);
-    transition: transform .25s cubic-bezier(.4,0,.2,1);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .side-panel.open { transform: translateX(0); }
-
-  .side-panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-
-  .side-panel-header h3 {
-    font-size: 13px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .side-panel-close {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .side-panel-close:hover { color: var(--text-primary); background: var(--bg-hover); }
-
-  .side-panel-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px;
-  }
-
-  .side-panel-body::-webkit-scrollbar { width: 6px; }
-  .side-panel-body::-webkit-scrollbar-track { background: transparent; }
-  .side-panel-body::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 3px; }
-
-  .detail-section {
-    margin-bottom: 20px;
-  }
-
-  .detail-section h4 {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: .8px;
-    color: var(--text-muted);
-    margin-bottom: 8px;
-  }
-
-  .detail-path {
-    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-    font-size: 12px;
-    color: var(--accent-blue);
-    background: var(--bg-tertiary);
-    padding: 8px 10px;
-    border-radius: 6px;
-    word-break: break-all;
-    line-height: 1.5;
-  }
-
-  .detail-type-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 10px;
-    border-radius: 100px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: capitalize;
-  }
-
-  .detail-loc {
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin-top: 6px;
-  }
-
-  .detail-list {
-    list-style: none;
-  }
-
-  .detail-list li {
-    font-size: 12px;
-    padding: 5px 8px;
-    border-radius: 4px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: background .1s;
-  }
-
-  .detail-list li:hover { background: var(--bg-hover); }
-
-  .detail-list li .arrow {
-    color: var(--text-muted);
-    font-size: 10px;
-    flex-shrink: 0;
-  }
-
-  .detail-list li .name {
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 11px;
-    color: var(--accent-blue);
-  }
-
-  .detail-list li .label {
-    color: var(--text-secondary);
-    font-size: 11px;
-  }
-
-  .detail-empty {
-    font-size: 12px;
-    color: var(--text-muted);
-    font-style: italic;
-  }
-
-  .api-badge {
-    display: inline-flex;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 10px;
-    font-weight: 700;
-    font-family: 'SF Mono', monospace;
-    margin-right: 4px;
-  }
-
-  .api-badge.get    { background: rgba(63,185,80,.2);  color: var(--node-service); }
-  .api-badge.post   { background: rgba(88,166,255,.2);  color: var(--node-screen); }
-  .api-badge.put    { background: rgba(240,136,62,.2);  color: var(--node-store); }
-  .api-badge.delete { background: rgba(255,123,114,.2); color: var(--node-api); }
-  .api-badge.patch  { background: rgba(188,140,255,.2); color: var(--node-component); }
-
-  /* ─────────── SVG Styles ─────────── */
-  .link {
-    fill: none;
-    stroke-opacity: .25;
-    transition: stroke-opacity .15s;
-  }
-
-  .link.highlighted { stroke-opacity: .8; }
-  .link.dimmed { stroke-opacity: .05; }
-
-  .node-circle {
-    stroke: var(--bg-primary);
-    stroke-width: 2;
-    cursor: pointer;
-    transition: r .15s, stroke-width .15s;
-  }
-
-  .node-circle:hover {
-    stroke-width: 3;
-  }
-
-  .node-circle.selected {
-    stroke: #fff;
-    stroke-width: 3;
-  }
-
-  .node-circle.highlighted {
-    stroke-width: 3;
-    filter: drop-shadow(0 0 6px currentColor);
-  }
-
-  .node-circle.dimmed { opacity: .15; }
-
-  .node-label {
-    font-size: 10px;
-    fill: var(--text-secondary);
-    pointer-events: none;
-    font-weight: 500;
-    text-anchor: middle;
-  }
-
-  .node-label.highlighted {
-    fill: var(--text-primary);
-    font-weight: 700;
-  }
-
-  .node-label.dimmed { opacity: .1; }
-
-  /* ─────────── Zoom Controls ─────────── */
-  .zoom-controls {
-    position: absolute;
-    bottom: 20px;
-    left: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    z-index: 40;
-  }
-
-  .zoom-btn {
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-size: 16px;
-    transition: all .15s;
-  }
-
-  .zoom-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-
-  /* ─────────── Minimap ─────────── */
-  .minimap {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    width: 180px;
-    height: 130px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    z-index: 40;
-  }
-
-  .minimap svg { width: 100%; height: 100%; }
-
-  /* ─────────── No data ─────────── */
-  .no-data {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 12px;
-    color: var(--text-muted);
-    font-size: 14px;
-  }
-
-  .no-data.hidden { display: none; }
-
-  /* ─────────── Loading ─────────── */
-  .loading-spinner {
-    width: 32px;
-    height: 32px;
-    border: 3px solid var(--border);
-    border-top-color: var(--accent-blue);
-    border-radius: 50%;
-    animation: spin .8s linear infinite;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ─────────── Tooltip ─────────── */
-  .tooltip {
-    position: fixed;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-light);
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 12px;
-    pointer-events: none;
-    z-index: 9000;
-    max-width: 300px;
-    box-shadow: var(--shadow);
-    opacity: 0;
-    transition: opacity .12s;
-  }
-
-  .tooltip.visible { opacity: 1; }
-
-  .tooltip .tt-name {
-    font-weight: 600;
-    margin-bottom: 2px;
-  }
-
-  .tooltip .tt-type {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: .5px;
-    color: var(--text-muted);
-  }
-
-  .tooltip .tt-path {
-    font-family: 'SF Mono', monospace;
-    font-size: 10px;
-    color: var(--text-secondary);
-    margin-top: 4px;
-    word-break: break-all;
-  }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg0:#0a0e14;--bg1:#0d1117;--bg2:#161b22;--bg3:#21262d;--bg4:#30363d;
+  --bd1:#262c36;--bd2:#30363d;--bd3:#3d444d;
+  --t1:#e6edf3;--t2:#8b949e;--t3:#6e7681;--t4:#484f58;
+  --blue:#58a6ff;--green:#3fb950;--purple:#bc8cff;--orange:#f0883e;
+  --red:#ff7b72;--cyan:#56d4dd;--pink:#f778ba;--yellow:#d29922;
+  --node-screen:#58a6ff;--node-component:#bc8cff;--node-hook:#56d4dd;
+  --node-store:#f0883e;--node-service:#3fb950;--node-api:#ff7b72;
+  --node-file:#8b949e;--node-package:#d29922;--node-endpoint:#f778ba;
+  --node-function:#79c0ff;--node-class:#d2a8ff;--node-variable:#7ee787;
+  --edge-import:#58a6ff;--edge-external:#d29922;--edge-jsx:#bc8cff;
+  --edge-call:#3fb950;--edge-api_call:#ff7b72;--edge-contains:#484f58;
+  --edge-extends:#f0883e;--edge-references:#56d4dd;
+  --r:8px;--shadow:0 8px 32px rgba(0,0,0,.5);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg0);color:var(--t1);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── HEADER ── */
+.header{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:var(--bg2);border-bottom:1px solid var(--bd2);z-index:100;flex-shrink:0;gap:12px}
+.header-left{display:flex;align-items:center;gap:14px}
+.logo{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:700;letter-spacing:-.5px;white-space:nowrap}
+.logo-icon{width:22px;height:22px;color:var(--blue)}
+.header-stats{display:flex;gap:14px;font-size:11px;color:var(--t3);white-space:nowrap}
+.header-stats .n{color:var(--t1);font-weight:600;font-variant-numeric:tabular-nums}
+.header-right{display:flex;gap:8px}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:6px;border:1px solid var(--bd3);background:var(--bg3);color:var(--t1);font-size:12px;font-weight:500;cursor:pointer;transition:all .12s;white-space:nowrap}
+.btn:hover{background:var(--bg4);border-color:var(--t3)}
+.btn-primary{background:#238636;border-color:#2ea043}.btn-primary:hover{background:#2ea043}
+.btn-sm{padding:4px 10px;font-size:11px}
+
+/* ── TOOLBAR ── */
+.toolbar{display:flex;align-items:center;gap:10px;padding:8px 20px;background:var(--bg2);border-bottom:1px solid var(--bd2);flex-shrink:0;flex-wrap:wrap}
+.search-box{position:relative;flex-shrink:0}
+.search-box input{background:var(--bg3);border:1px solid var(--bd2);border-radius:6px;padding:6px 10px 6px 30px;color:var(--t1);font-size:12px;width:220px;outline:none;transition:border-color .12s}
+.search-box input:focus{border-color:var(--blue)}
+.search-box input::placeholder{color:var(--t4)}
+.search-box svg{position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--t4);pointer-events:none}
+
+/* ── VIEW TABS ── */
+.view-tabs{display:flex;gap:2px;background:var(--bg1);border-radius:6px;padding:2px;flex-shrink:0}
+.view-tab{padding:5px 12px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;color:var(--t3);transition:all .12s;border:none;background:none}
+.view-tab:hover{color:var(--t2)}
+.view-tab.active{background:var(--bg3);color:var(--t1);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+
+/* ── FILTER PILLS ── */
+.filter-pills{display:flex;gap:4px;flex-wrap:wrap;flex:1;min-width:0}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:100px;font-size:10px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:all .12s;user-select:none;text-transform:capitalize;white-space:nowrap}
+.pill .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.pill.active{opacity:1}.pill.inactive{opacity:.3}
+.pill[data-t="screen"]{background:rgba(88,166,255,.12);color:var(--node-screen);border-color:rgba(88,166,255,.25)}
+.pill[data-t="component"]{background:rgba(188,140,255,.12);color:var(--node-component);border-color:rgba(188,140,255,.25)}
+.pill[data-t="hook"]{background:rgba(86,212,221,.12);color:var(--node-hook);border-color:rgba(86,212,221,.25)}
+.pill[data-t="store"]{background:rgba(240,136,62,.12);color:var(--node-store);border-color:rgba(240,136,62,.25)}
+.pill[data-t="service"]{background:rgba(63,185,80,.12);color:var(--node-service);border-color:rgba(63,185,80,.25)}
+.pill[data-t="api"]{background:rgba(255,123,114,.12);color:var(--node-api);border-color:rgba(255,123,114,.25)}
+.pill[data-t="function"]{background:rgba(121,192,255,.12);color:var(--node-function);border-color:rgba(121,192,255,.25)}
+.pill[data-t="class"]{background:rgba(210,168,255,.12);color:var(--node-class);border-color:rgba(210,168,255,.25)}
+.pill[data-t="file"]{background:rgba(139,148,158,.12);color:var(--node-file);border-color:rgba(139,148,158,.25)}
+.pill[data-t="package"]{background:rgba(210,153,34,.12);color:var(--node-package);border-color:rgba(210,153,34,.25)}
+.pill[data-t="endpoint"]{background:rgba(247,120,186,.12);color:var(--node-endpoint);border-color:rgba(247,120,186,.25)}
+
+/* ── EDGE LEGEND ── */
+.edge-legend{display:flex;gap:10px;align-items:center;font-size:10px;color:var(--t3);flex-shrink:0;margin-left:auto}
+.el-item{display:flex;align-items:center;gap:3px}
+.el-line{width:16px;height:0}
+
+/* ── MAIN ── */
+.main-area{flex:1;position:relative;overflow:hidden;background:var(--bg0)}
+#graph-canvas{width:100%;height:100%;cursor:grab}
+#graph-canvas:active{cursor:grabbing}
+
+/* ── DROP ZONE ── */
+.drop-zone{position:fixed;inset:0;background:rgba(10,14,20,.94);display:flex;align-items:center;justify-content:center;z-index:9999;transition:opacity .2s}
+.drop-zone.hidden{opacity:0;pointer-events:none}
+.drop-box{border:2px dashed var(--blue);border-radius:16px;padding:50px 70px;text-align:center;background:var(--bg2);max-width:460px}
+.drop-box h2{font-size:20px;margin-bottom:6px}
+.drop-box p{color:var(--t2);font-size:13px;margin-bottom:16px}
+.drop-box .or{color:var(--t4);margin:10px 0;font-size:11px;text-transform:uppercase;letter-spacing:1px}
+
+/* ── SIDE PANEL ── */
+.side-panel{position:absolute;top:0;right:0;width:380px;height:100%;background:var(--bg2);border-left:1px solid var(--bd2);z-index:50;transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;overflow:hidden}
+.side-panel.open{transform:translateX(0)}
+.sp-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--bd2);flex-shrink:0}
+.sp-header h3{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
+.sp-close{background:none;border:none;color:var(--t2);cursor:pointer;padding:4px;border-radius:4px;display:flex;align-items:center}
+.sp-close:hover{color:var(--t1);background:var(--bg4)}
+.sp-body{flex:1;overflow-y:auto;padding:14px}
+.sp-body::-webkit-scrollbar{width:5px}.sp-body::-webkit-scrollbar-track{background:transparent}.sp-body::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+.ds{margin-bottom:16px}
+.ds h4{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--t4);margin-bottom:6px;font-weight:600}
+.ds-path{font-family:'SF Mono','Fira Code','Cascadia Code',monospace;font-size:11px;color:var(--blue);background:var(--bg3);padding:7px 9px;border-radius:5px;word-break:break-all;line-height:1.5}
+.ds-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:100px;font-size:10px;font-weight:600;text-transform:capitalize}
+.ds-loc{font-size:11px;color:var(--t2);margin-top:4px}
+.ds-list{list-style:none}
+.ds-list li{font-size:11px;padding:4px 7px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background .08s}
+.ds-list li:hover{background:var(--bg4)}
+.ds-list .arrow{color:var(--t4);font-size:9px;flex-shrink:0}
+.ds-list .nm{font-family:'SF Mono','Fira Code',monospace;font-size:10px;color:var(--blue)}
+.ds-list .lb{color:var(--t2);font-size:10px}
+.ds-empty{font-size:11px;color:var(--t4);font-style:italic}
+.api-badge{display:inline-flex;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700;font-family:'SF Mono',monospace;margin-right:3px}
+.api-badge.get{background:rgba(63,185,80,.2);color:var(--green)}
+.api-badge.post{background:rgba(88,166,255,.2);color:var(--blue)}
+.api-badge.put{background:rgba(240,136,62,.2);color:var(--orange)}
+.api-badge.delete{background:rgba(255,123,114,.2);color:var(--red)}
+.api-badge.patch{background:rgba(188,140,255,.2);color:var(--purple)}
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.metric-card{background:var(--bg3);border-radius:6px;padding:8px 10px}
+.metric-card .val{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+.metric-card .lbl{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+
+/* ── ZOOM CONTROLS ── */
+.zoom-controls{position:absolute;bottom:16px;left:16px;display:flex;flex-direction:column;gap:3px;z-index:40}
+.zoom-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:var(--bg2);border:1px solid var(--bd2);border-radius:6px;color:var(--t2);cursor:pointer;font-size:15px;transition:all .12s}
+.zoom-btn:hover{background:var(--bg4);color:var(--t1)}
+
+/* ── LAYER INDICATOR ── */
+.layer-indicator{position:absolute;top:12px;left:16px;z-index:40;display:flex;flex-direction:column;gap:4px}
+.layer-row{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--t3);background:var(--bg2);padding:3px 8px;border-radius:4px;border:1px solid var(--bd2)}
+.layer-dot{width:6px;height:6px;border-radius:50%}
+
+/* ── NO DATA ── */
+.no-data{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--t4);font-size:13px}
+.no-data.hidden{display:none}
+.spinner{width:28px;height:28px;border:3px solid var(--bd2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── SVG ── */
+.link{fill:none;stroke-opacity:.2;transition:stroke-opacity .12s}
+.link.hl{stroke-opacity:.7}.link.dim{stroke-opacity:.04}
+.node-c{stroke:var(--bg0);stroke-width:1.5;cursor:pointer;transition:stroke-width .1s}
+.node-c:hover{stroke-width:2.5}
+.node-c.sel{stroke:#fff;stroke-width:2.5}
+.node-c.hl{stroke-width:2.5;filter:drop-shadow(0 0 5px currentColor)}
+.node-c.dim{opacity:.12}
+.node-lbl{font-size:9px;fill:var(--t3);pointer-events:none;font-weight:500;text-anchor:middle}
+.node-lbl.hl{fill:var(--t1);font-weight:700;font-size:10px}
+.node-lbl.dim{opacity:.08}
 </style>
 </head>
 <body>
 
-<!-- ──────── Drop Zone Overlay ──────── -->
-<div class="drop-zone-overlay" id="dropOverlay">
-  <div class="drop-zone-box">
+<!-- DROP ZONE -->
+<div class="drop-zone" id="dropOverlay">
+  <div class="drop-box">
     <h2>Open graph.json</h2>
-    <p>Drag & drop your <code>graph.json</code> file here</p>
+    <p>Drag &amp; drop your <code>graph.json</code> file</p>
     <div class="or">or</div>
     <button class="btn btn-primary" id="browseBtn">Browse Files</button>
     <input type="file" id="fileInput" accept=".json" style="display:none">
   </div>
 </div>
 
-<!-- ──────── Header ──────── -->
+<!-- HEADER -->
 <div class="header">
   <div class="header-left">
     <div class="logo">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="3"/>
-        <line x1="12" y1="2" x2="12" y2="6"/>
-        <line x1="12" y1="18" x2="12" y2="22"/>
-        <line x1="2" y1="12" x2="6" y2="12"/>
-        <line x1="18" y1="12" x2="22" y2="12"/>
-        <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/>
-        <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
-        <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/>
-        <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
+      <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
+        <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
       </svg>
-      CodeGraph
+      CodeGraph v2
     </div>
     <div class="header-stats" id="headerStats"></div>
   </div>
   <div class="header-right">
-    <button class="btn" id="loadNewBtn">Load New File</button>
+    <button class="btn" id="loadNewBtn">Load New</button>
   </div>
 </div>
 
-<!-- ──────── Toolbar ──────── -->
+<!-- TOOLBAR -->
 <div class="toolbar" id="toolbar" style="display:none">
   <div class="search-box">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-    </svg>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
     <input type="text" id="searchInput" placeholder="Search nodes…">
+  </div>
+  <div class="view-tabs" id="viewTabs">
+    <button class="view-tab active" data-view="all">All</button>
+    <button class="view-tab" data-view="dependency">Dependencies</button>
+    <button class="view-tab" data-view="component">Components</button>
+    <button class="view-tab" data-view="callgraph">Call Graph</button>
+    <button class="view-tab" data-view="apiflow">API Flow</button>
+    <button class="view-tab" data-view="architecture">Architecture</button>
   </div>
   <div class="filter-pills" id="filterPills"></div>
   <div class="edge-legend">
-    <div class="edge-legend-item"><svg width="20" height="4"><line x1="0" y1="2" x2="20" y2="2" stroke="var(--edge-import)" stroke-width="2"/></svg>Import</div>
-    <div class="edge-legend-item"><svg width="20" height="4"><line x1="0" y1="2" x2="20" y2="2" stroke="var(--edge-jsx)" stroke-width="2" stroke-dasharray="4,2"/></svg>JSX</div>
-    <div class="edge-legend-item"><svg width="20" height="4"><line x1="0" y1="2" x2="20" y2="2" stroke="var(--edge-api)" stroke-width="2" stroke-dasharray="6,3"/></svg>API</div>
-    <div class="edge-legend-item"><svg width="20" height="4"><line x1="0" y1="2" x2="20" y2="2" stroke="var(--edge-call)" stroke-width="1.5" stroke-dasharray="2,2"/></svg>Call</div>
-    <div class="edge-legend-item"><svg width="20" height="4"><line x1="0" y1="2" x2="20" y2="2" stroke="var(--edge-external)" stroke-width="1.5" stroke-dasharray="8,4"/></svg>External</div>
+    <div class="el-item"><svg width="16" height="2"><line x1="0" y1="1" x2="16" y2="1" stroke="var(--edge-import)" stroke-width="1.5"/></svg>Import</div>
+    <div class="el-item"><svg width="16" height="2"><line x1="0" y1="1" x2="16" y2="1" stroke="var(--edge-jsx)" stroke-width="1.5" stroke-dasharray="4,2"/></svg>JSX</div>
+    <div class="el-item"><svg width="16" height="2"><line x1="0" y1="1" x2="16" y2="1" stroke="var(--edge-api_call)" stroke-width="1.5" stroke-dasharray="6,3"/></svg>API</div>
+    <div class="el-item"><svg width="16" height="2"><line x1="0" y1="1" x2="16" y2="1" stroke="var(--edge-call)" stroke-width="1" stroke-dasharray="2,2"/></svg>Call</div>
+    <div class="el-item"><svg width="16" height="2"><line x1="0" y1="1" x2="16" y2="1" stroke="var(--edge-contains)" stroke-width="1" stroke-dasharray="1,3"/></svg>Contains</div>
   </div>
 </div>
 
-<!-- ──────── Main Canvas ──────── -->
+<!-- MAIN -->
 <div class="main-area" id="mainArea">
   <svg id="graph-canvas"></svg>
+  <div class="no-data" id="noData"><span>Load graph.json to get started</span></div>
 
-  <div class="no-data" id="noData">
-    <div class="loading-spinner" id="spinner" style="display:none"></div>
-    <span id="noDataText">Load a graph.json file to get started</span>
-  </div>
+  <!-- Layer indicator -->
+  <div class="layer-indicator" id="layerIndicator" style="display:none"></div>
 
-  <!-- Side Panel -->
+  <!-- Side panel -->
   <div class="side-panel" id="sidePanel">
-    <div class="side-panel-header">
-      <h3 id="sidePanelTitle">Node Details</h3>
-      <button class="side-panel-close" id="sidePanelClose">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
+    <div class="sp-header">
+      <h3 id="spTitle">Details</h3>
+      <button class="sp-close" id="spClose"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
-    <div class="side-panel-body" id="sidePanelBody"></div>
+    <div class="sp-body" id="spBody"></div>
   </div>
 
-  <!-- Zoom Controls -->
+  <!-- Zoom -->
   <div class="zoom-controls">
     <button class="zoom-btn" id="zoomIn" title="Zoom In">+</button>
     <button class="zoom-btn" id="zoomOut" title="Zoom Out">−</button>
-    <button class="zoom-btn" id="zoomReset" title="Reset View">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-        <path d="M3 3v5h5"/>
-      </svg>
-    </button>
+    <button class="zoom-btn" id="zoomReset" title="Reset"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
   </div>
 </div>
 
-<!-- Tooltip -->
-<div class="tooltip" id="tooltip">
-  <div class="tt-name" id="ttName"></div>
-  <div class="tt-type" id="ttType"></div>
-  <div class="tt-path" id="ttPath"></div>
-</div>
-
 <script>
-// ══════════════════════════════════════════════════════════
-//  CodeGraph Visualizer — Interactive Force-Directed Graph
-// ══════════════════════════════════════════════════════════
+(function(){
+'use strict';
 
-(function() {
-  'use strict';
+// ── COLORS ──
+const NC={screen:'#58a6ff',component:'#bc8cff',hook:'#56d4dd',store:'#f0883e',service:'#3fb950',api:'#ff7b72',file:'#8b949e',package:'#d29922',endpoint:'#f778ba',function:'#79c0ff',class:'#d2a8ff',variable:'#7ee787'};
+const EC={import:'#58a6ff',external:'#d29922',jsx:'#bc8cff',call:'#3fb950',api_call:'#ff7b72',contains:'#484f58',extends:'#f0883e',references:'#56d4dd'};
+const EDASH={import:'none',external:'8,4',jsx:'4,2',call:'2,2',api_call:'6,3',contains:'1,3',extends:'10,3',references:'3,3'};
+const NR={screen:11,component:9,hook:8,store:10,service:8,api:10,file:6,package:7,endpoint:7,function:5,class:8,variable:4};
+const ICONS={screen:'📱',component:'🧩',hook:'🪝',store:'🗄️',service:'⚙️',api:'🌐',file:'📄',package:'📦',endpoint:'🔌',function:'ƒ',class:'C',variable:'v'};
 
-  // ──── Color Map ────
-  const NODE_COLORS = {
-    screen:    '#58a6ff',
-    component: '#bc8cff',
-    hook:      '#56d4dd',
-    store:     '#f0883e',
-    service:   '#3fb950',
-    api:       '#ff7b72',
-    file:      '#8b949e',
-    package:   '#d29922',
-    endpoint:  '#f778ba',
-  };
+const LAYER_ORDER=['screen','component','hook','store','service','api','file','function','class','variable','package','endpoint'];
+const LAYER_Y={screen:0,component:1,hook:2,store:3,service:4,api:5,file:6,function:7,class:7,variable:7,package:8,endpoint:5};
 
-  const EDGE_COLORS = {
-    import:   '#58a6ff',
-    jsx:      '#bc8cff',
-    api:      '#ff7b72',
-    call:     '#3fb950',
-    external: '#d29922',
-  };
+// ── STATE ──
+let data=null,sim=null,svg,g,linkG,nodeG,lblG,zoom;
+let activeView='all',activeTypes=new Set(),searchTerm='',selectedNode=null;
+let nodeMap={},allNodes=[],allEdges=[];
+let _links,_nodeGs,_labels;
 
-  const EDGE_DASH = {
-    import:   'none',
-    jsx:      '4,2',
-    api:      '6,3',
-    call:     '2,2',
-    external: '8,4',
-  };
+// ── DOM ──
+const $=id=>document.getElementById(id);
+const dropOv=$('dropOverlay'),browseBtn=$('browseBtn'),fileIn=$('fileInput'),loadBtn=$('loadNewBtn');
+const toolbar=$('toolbar'),pills=$('filterPills'),searchIn=$('searchInput'),hStats=$('headerStats');
+const noData=$('noData'),sp=$('sidePanel'),spBody=$('spBody'),spClose=$('spClose'),spTitle=$('spTitle');
+const viewTabs=$('viewTabs'),layerInd=$('layerIndicator');
 
-  const NODE_ICONS = {
-    screen:    '📱',
-    component: '🧩',
-    hook:      '🪝',
-    store:     '🗄️',
-    service:   '⚙️',
-    api:       '🌐',
-    file:      '📄',
-    package:   '📦',
-    endpoint:  '🔌',
-  };
+// ── LOAD ──
+function loadData(d){
+  data=d;nodeMap={};allNodes=d.nodes||[];allEdges=d.edges||[];
+  allNodes.forEach(n=>nodeMap[n.id]=n);
+  activeTypes=new Set(allNodes.map(n=>n.type));
+  renderStats();renderPills();renderLayerIndicator();renderGraph();
+  dropOv.classList.add('hidden');toolbar.style.display='flex';noData.classList.add('hidden');
+}
 
-  const NODE_RADIUS = {
-    screen:    10,
-    component: 8,
-    hook:      7,
-    store:     9,
-    service:   7,
-    api:       9,
-    file:      5,
-    package:   6,
-    endpoint:  6,
-  };
+function renderStats(){
+  if(!data)return;const s=data.stats||{};
+  hStats.innerHTML=`
+    <span><span class="n">${allNodes.length}</span> nodes</span>
+    <span><span class="n">${allEdges.length}</span> edges</span>
+    <span><span class="n">${s.fileCount||'—'}</span> files</span>
+    <span><span class="n">${(s.totalLOC||0).toLocaleString()}</span> LOC</span>
+    ${data.cycles?.length?`<span style="color:var(--red)"><span class="n">${data.cycles.length}</span> cycles</span>`:''}
+  `;
+}
 
-  // ──── State ────
-  let graphData = null;
-  let simulation = null;
-  let svg, g, linkGroup, nodeGroup, labelGroup;
-  let zoomBehavior;
-  let activeTypes = new Set();
-  let selectedNode = null;
-  let searchTerm = '';
-  let nodeMap = {};
+function renderPills(){
+  const types=[...new Set(allNodes.map(n=>n.type))];
+  pills.innerHTML='';
+  types.forEach(t=>{
+    const p=document.createElement('span');
+    p.className=`pill ${activeTypes.has(t)?'active':'inactive'}`;
+    p.dataset.t=t;
+    p.innerHTML=`<span class="dot" style="background:${NC[t]||'#888'}"></span>${t}`;
+    p.onclick=()=>{activeTypes.has(t)?activeTypes.delete(t):activeTypes.add(t);
+      document.querySelectorAll('.pill').forEach(p=>{p.classList.toggle('active',activeTypes.has(p.dataset.t));p.classList.toggle('inactive',!activeTypes.has(p.dataset.t))});
+      applyFilters()};
+    pills.appendChild(p);
+  });
+}
 
-  // ──── DOM ────
-  const dropOverlay   = document.getElementById('dropOverlay');
-  const browseBtn     = document.getElementById('browseBtn');
-  const fileInput     = document.getElementById('fileInput');
-  const loadNewBtn    = document.getElementById('loadNewBtn');
-  const toolbar       = document.getElementById('toolbar');
-  const filterPills   = document.getElementById('filterPills');
-  const searchInput   = document.getElementById('searchInput');
-  const headerStats   = document.getElementById('headerStats');
-  const noData        = document.getElementById('noData');
-  const noDataText    = document.getElementById('noDataText');
-  const spinner       = document.getElementById('spinner');
-  const sidePanel     = document.getElementById('sidePanel');
-  const sidePanelBody = document.getElementById('sidePanelBody');
-  const sidePanelClose= document.getElementById('sidePanelClose');
-  const sidePanelTitle= document.getElementById('sidePanelTitle');
-  const tooltip       = document.getElementById('tooltip');
-  const ttName        = document.getElementById('ttName');
-  const ttType        = document.getElementById('ttType');
-  const ttPath        = document.getElementById('ttPath');
+function renderLayerIndicator(){
+  const types=[...new Set(allNodes.map(n=>n.type))].sort((a,b)=>(LAYER_Y[a]||9)-(LAYER_Y[b]||9));
+  layerInd.innerHTML='';
+  types.forEach(t=>{
+    const row=document.createElement('div');row.className='layer-row';
+    row.innerHTML=`<span class="layer-dot" style="background:${NC[t]||'#888'}"></span>${t} (${allNodes.filter(n=>n.type===t).length})`;
+    layerInd.appendChild(row);
+  });
+  layerInd.style.display='flex';
+}
 
-  // ──── Init SVG ────
-  function initSVG() {
-    svg = d3.select('#graph-canvas');
-    svg.selectAll('*').remove();
+// ── VIEW TABS ──
+viewTabs.addEventListener('click',e=>{
+  if(!e.target.classList.contains('view-tab'))return;
+  document.querySelectorAll('.view-tab').forEach(t=>t.classList.remove('active'));
+  e.target.classList.add('active');
+  activeView=e.target.dataset.view;
+  applyFilters();
+});
 
-    zoomBehavior = d3.zoom()
-      .scaleExtent([0.1, 4])
-      .on('zoom', (event) => {
-        g.attr('transform', event.transform);
-      });
+// ── GRAPH ──
+function getEdgeKindsForView(view){
+  switch(view){
+    case 'dependency':return['import','external'];
+    case 'component':return['jsx','contains'];
+    case 'callgraph':return['call','references'];
+    case 'apiflow':return['api_call'];
+    case 'architecture':return['import','external','call','api_call'];
+    default:return null;
+  }
+}
 
-    svg.call(zoomBehavior);
+function getNodeTypesForView(view){
+  switch(view){
+    case 'dependency':return['file','screen','component','hook','store','service','api','package'];
+    case 'component':return['component','screen','hook'];
+    case 'callgraph':return['function','hook','class','store','service','api'];
+    case 'apiflow':return['screen','component','hook','service','api','endpoint'];
+    case 'architecture':return['screen','component','store','service','api','endpoint'];
+    default:return null;
+  }
+}
 
-    // Defs for arrow markers
-    const defs = svg.append('defs');
+function renderGraph(){
+  if(sim)sim.stop();
+  svg=d3.select('#graph-canvas');svg.selectAll('*').remove();
 
-    Object.entries(EDGE_COLORS).forEach(([type, color]) => {
-      defs.append('marker')
-        .attr('id', `arrow-${type}`)
-        .attr('viewBox', '0 -5 10 10')
-        .attr('refX', 20)
-        .attr('refY', 0)
-        .attr('markerWidth', 6)
-        .attr('markerHeight', 6)
-        .attr('orient', 'auto')
-        .append('path')
-        .attr('fill', color)
-        .attr('d', 'M0,-5L10,0L0,5');
+  zoom=d3.zoom().scaleExtent([.05,6]).on('zoom',e=>g.attr('transform',e.transform));
+  svg.call(zoom);
+
+  // Arrow markers
+  const defs=svg.append('defs');
+  Object.entries(EC).forEach(([k,c])=>{
+    defs.append('marker').attr('id',`arr-${k}`).attr('viewBox','0 -5 10 10').attr('refX',18).attr('refY',0).attr('markerWidth',5).attr('markerHeight',5).attr('orient','auto')
+      .append('path').attr('fill',c).attr('d','M0,-4L10,0L0,4');
+  });
+
+  g=svg.append('g');
+  linkG=g.append('g').attr('class','links');
+  nodeG=g.append('g').attr('class','nodes');
+  lblG=g.append('g').attr('class','labels');
+
+  const W=svg.node().clientWidth,H=svg.node().clientHeight;
+  const edgeKinds=getEdgeKindsForView(activeView);
+  const nodeTypes=getNodeTypesForView(activeView);
+  const isArchitecture=activeView==='architecture';
+
+  // Filter nodes
+  let visNodes=allNodes.filter(n=>{
+    if(!activeTypes.has(n.type))return false;
+    if(nodeTypes&&!nodeTypes.includes(n.type))return false;
+    return true;
+  });
+  const visIds=new Set(visNodes.map(n=>n.id));
+
+  // Filter edges
+  let visEdges=allEdges.filter(e=>{
+    const sid=e.source.id||e.source,tid=e.target.id||e.target;
+    if(!visIds.has(sid)||!visIds.has(tid))return false;
+    if(edgeKinds&&!edgeKinds.includes(e.kind))return false;
+    return true;
+  });
+
+  // D3 data
+  const nodes=visNodes.map(n=>({...n,x:Math.random()*W,y:isArchitecture?(LAYER_Y[n.type]||5)*(H/10)+50:Math.random()*H}));
+  const byId={};nodes.forEach(n=>byId[n.id]=n);
+  const edges=visEdges.map(e=>({...e,source:byId[e.source.id||e.source]||e.source,target:byId[e.target.id||e.target]||e.target})).filter(e=>byId[e.source.id||e.source]&&byId[e.target.id||e.target]);
+
+  // ── Links ──
+  _links=linkG.selectAll('line').data(edges).join('line')
+    .attr('class','link')
+    .attr('stroke',d=>EC[d.kind]||'#444')
+    .attr('stroke-width',d=>d.kind==='contains'?.5:d.kind==='import'?1.2:1)
+    .attr('stroke-dasharray',d=>EDASH[d.kind]||'none')
+    .attr('marker-end',d=>`url(#arr-${d.kind})`);
+
+  // ── Nodes ──
+  _nodeGs=nodeG.selectAll('g').data(nodes,d=>d.id).join('g')
+    .call(d3.drag().on('start',dragS).on('drag',dragM).on('end',dragE));
+
+  _nodeGs.append('circle').attr('class','node-c')
+    .attr('r',d=>NR[d.type]||6)
+    .attr('fill',d=>NC[d.type]||'#888')
+    .on('click',(e,d)=>selectNode(d));
+
+  // ── Labels ──
+  _labels=lblG.selectAll('text').data(nodes,d=>d.id).join('text')
+    .attr('class','node-lbl')
+    .attr('dy',d=>(NR[d.type]||6)+11)
+    .text(d=>{const p=(d.qualified_name||d.name||d.id).split('::').pop();return p.replace(/\.(js|jsx|ts|tsx)$/,'')});
+
+  // ── Simulation ──
+  const forces=[
+    d3.forceLink(edges).id(d=>d.id).distance(d=>{
+      if(d.kind==='api_call')return 110;if(d.kind==='jsx')return 70;if(d.kind==='contains')return 40;return 55;
+    }).strength(.3),
+    d3.forceManyBody().strength(d=>-(NR[d.type]||6)*35),
+    d3.forceCenter(W/2,H/2),
+    d3.forceCollide().radius(d=>(NR[d.type]||6)+6),
+  ];
+
+  if(isArchitecture){
+    // Layered layout: constrain Y by type
+    forces.push(d3.forceY(d=>(LAYER_Y[d.type]||5)*(H/10)+50).strength(.8));
+    forces.push(d3.forceX(W/2).strength(.05));
+  } else {
+    forces.push(d3.forceX(W/2).strength(.02));
+    forces.push(d3.forceY(H/2).strength(.02));
+  }
+
+  sim=d3.forceSimulation(nodes).alphaDecay(.02)
+    .force('link',forces[0]).force('charge',forces[1]).force('center',forces[2]).force('collide',forces[3]);
+  if(isArchitecture){sim.force('yLayer',forces[4]).force('xCenter',forces[5])}
+  else{sim.force('x',forces[4]).force('y',forces[5])}
+
+  sim.on('tick',()=>{
+    _links.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);
+    _nodeGs.attr('transform',d=>`translate(${d.x},${d.y})`);
+    _labels.attr('x',d=>d.x).attr('y',d=>d.y);
+  });
+
+  window._nodes=nodes;window._edges=edges;
+
+  // Auto-fit
+  setTimeout(()=>{
+    const b=g.node().getBBox();if(!b.width)return;
+    const s=.75/Math.max(b.width/W,b.height/H);
+    svg.transition().duration(600).call(zoom.transform,d3.zoomIdentity.translate(W/2-s*(b.x+b.width/2),H/2-s*(b.y+b.height/2)).scale(s));
+  },1200);
+}
+
+function applyFilters(){renderGraph();if(searchTerm)applySearch(searchTerm)}
+
+function applySearch(term){
+  term=term.toLowerCase();
+  if(!term){_nodeGs?.selectAll('.node-c').classed('hl',false).classed('dim',false);_labels?.classed('hl',false).classed('dim',false);_links?.classed('hl',false).classed('dim',false);return}
+  const matchIds=new Set();
+  allNodes.forEach(n=>{
+    const s=[n.name,n.id,n.qualified_name,n.file_path,n.kind,JSON.stringify(n.metadata||'')].join(' ').toLowerCase();
+    if(s.includes(term))matchIds.add(n.id);
+  });
+  _nodeGs?.selectAll('.node-c').classed('hl',d=>matchIds.has(d.id)).classed('dim',d=>!matchIds.has(d.id));
+  _labels?.classed('hl',d=>matchIds.has(d.id)).classed('dim',d=>!matchIds.has(d.id));
+  _links?.classed('hl',d=>matchIds.has(d.source.id||d.source)||matchIds.has(d.target.id||d.target)).classed('dim',d=>!matchIds.has(d.source.id||d.source)&&!matchIds.has(d.target.id||d.target));
+}
+
+// ── SELECT NODE ──
+function selectNode(d){
+  selectedNode=d;
+  _nodeGs?.selectAll('.node-c').classed('sel',n=>n.id===d.id);
+  renderSP(d);sp.classList.add('open');
+}
+
+function renderSP(d){
+  const c=NC[d.type]||'#888',ic=ICONS[d.type]||'?';
+  const name=d.name||d.id.split('::').pop()||d.id;
+  spTitle.innerHTML=`<span style="font-size:15px">${ic}</span> ${name}`;
+
+  const incoming=allEdges.filter(e=>(e.target.id||e.target)===d.id);
+  const outgoing=allEdges.filter(e=>(e.source.id||e.source)===d.id);
+
+  let h='';
+
+  // Type + metrics
+  h+=`<div class="ds"><h4>Type</h4><span class="ds-badge" style="background:${c}22;color:${c};border:1px solid ${c}44">${ic} ${d.type}</span></div>`;
+
+  // Path
+  if(d.file_path)h+=`<div class="ds"><h4>Path</h4><div class="ds-path">${d.file_path}</div></div>`;
+  if(d.qualified_name&&d.qualified_name!==d.file_path)h+=`<div class="ds"><h4>Qualified Name</h4><div class="ds-path">${d.qualified_name}</div></div>`;
+
+  // Metrics
+  if(d.fan_in!==undefined||d.fan_out!==undefined||d.instability!==undefined){
+    h+=`<div class="ds"><h4>Metrics</h4><div class="metric-grid">
+      <div class="metric-card"><div class="val" style="color:var(--green)">${d.fan_in||0}</div><div class="lbl">Fan-in</div></div>
+      <div class="metric-card"><div class="val" style="color:var(--blue)">${d.fan_out||0}</div><div class="lbl">Fan-out</div></div>
+      <div class="metric-card"><div class="val" style="color:var(--orange)">${d.instability!==undefined?d.instability.toFixed(2):'—'}</div><div class="lbl">Instability</div></div>
+      <div class="metric-card"><div class="val">${(d.fan_in||0)+(d.fan_out||0)}</div><div class="lbl">Total</div></div>
+    </div></div>`;
+  }
+
+  // Size
+  if(d.start_line&&d.end_line)h+=`<div class="ds"><h4>Lines</h4><div class="ds-loc">${d.start_line}–${d.end_line} (${d.end_line-d.start_line+1} lines)</div></div>`;
+
+  // Signature
+  if(d.signature)h+=`<div class="ds"><h4>Signature</h4><div class="ds-path">${d.signature}</div></div>`;
+
+  // Visibility / flags
+  const flags=[];
+  if(d.is_exported)flags.push('exported');if(d.is_async)flags.push('async');if(d.is_static)flags.push('static');
+  if(d.visibility&&d.visibility!=='public')flags.push(d.visibility);
+  if(flags.length)h+=`<div class="ds"><h4>Flags</h4><div>${flags.map(f=>`<span class="ds-badge" style="background:var(--bg3);color:var(--t2);font-size:9px;border:1px solid var(--bd3)">${f}</span>`).join(' ')}</div></div>`;
+
+  // API calls
+  const apiEdges=outgoing.filter(e=>e.kind==='api_call');
+  if(apiEdges.length){
+    h+=`<div class="ds"><h4>API Calls (${apiEdges.length})</h4><ul class="ds-list">`;
+    apiEdges.forEach(e=>{
+      const m=e.metadata||{};const method=(m.method||'GET').toLowerCase();
+      h+=`<li><span class="api-badge ${method}">${m.method||'GET'}</span><span class="nm">${m.url||e.label||'—'}</span><span class="lb">${m.type||e.kind}</span></li>`;
     });
-
-    g = svg.append('g');
-    linkGroup = g.append('g').attr('class', 'links');
-    nodeGroup = g.append('g').attr('class', 'nodes');
-    labelGroup = g.append('g').attr('class', 'labels');
+    h+=`</ul></div>`;
   }
 
-  // ──── Load Data ────
-  function loadData(data) {
-    graphData = data;
-    nodeMap = {};
-    data.nodes.forEach(n => nodeMap[n.id] = n);
-
-    activeTypes = new Set(Object.keys(NODE_COLORS));
-    activeTypes = new Set([...new Set(data.nodes.map(n => n.type))]);
-
-    renderToolbar();
-    renderStats();
-    renderGraph();
-
-    dropOverlay.classList.add('hidden');
-    toolbar.style.display = 'flex';
-    noData.classList.add('hidden');
-  }
-
-  // ──── Render Stats ────
-  function renderStats() {
-    if (!graphData) return;
-    const s = graphData.stats || {};
-    const nodes = graphData.nodes.length;
-    const edges = graphData.edges.length;
-    const files = s.totalFiles || nodes;
-    const loc = s.totalLines || 0;
-
-    headerStats.innerHTML = `
-      <span><span class="num">${nodes}</span> nodes</span>
-      <span><span class="num">${edges}</span> edges</span>
-      <span><span class="num">${files}</span> files</span>
-      <span><span class="num">${loc.toLocaleString()}</span> LOC</span>
-    `;
-  }
-
-  // ──── Render Toolbar ────
-  function renderToolbar() {
-    const types = [...new Set(graphData.nodes.map(n => n.type))];
-    filterPills.innerHTML = '';
-
-    types.forEach(type => {
-      const pill = document.createElement('span');
-      pill.className = `pill ${activeTypes.has(type) ? 'active' : 'inactive'}`;
-      pill.dataset.type = type;
-      pill.innerHTML = `<span class="dot" style="background:${NODE_COLORS[type] || '#888'}"></span>${type}`;
-      pill.addEventListener('click', () => toggleType(type));
-      filterPills.appendChild(pill);
+  // Incoming
+  if(incoming.length){
+    h+=`<div class="ds"><h4>Incoming (${incoming.length})</h4><ul class="ds-list">`;
+    incoming.forEach(e=>{
+      const sid=e.source.id||e.source;const sn=nodeMap[sid];const sc=sn?NC[sn.type]||'#888':'#888';
+      h+=`<li onclick="window._selById('${sid}')"><span class="arrow">←</span><span style="color:${sc}">●</span><span class="nm">${sn?sn.name:sid.split('::').pop()}</span><span class="lb">${e.kind}${e.label?': '+e.label:''}</span></li>`;
     });
+    h+=`</ul></div>`;
   }
 
-  function toggleType(type) {
-    if (activeTypes.has(type)) {
-      activeTypes.delete(type);
-    } else {
-      activeTypes.add(type);
-    }
-    // Update pills
-    document.querySelectorAll('.pill').forEach(p => {
-      p.classList.toggle('active', activeTypes.has(p.dataset.type));
-      p.classList.toggle('inactive', !activeTypes.has(p.dataset.type));
+  // Outgoing
+  if(outgoing.length){
+    h+=`<div class="ds"><h4>Outgoing (${outgoing.length})</h4><ul class="ds-list">`;
+    outgoing.forEach(e=>{
+      const tid=e.target.id||e.target;const tn=nodeMap[tid];const tc=tn?NC[tn.type]||'#888':'#888';
+      h+=`<li onclick="window._selById('${tid}')"><span class="arrow">→</span><span style="color:${tc}">●</span><span class="nm">${tn?tn.name:tid.split('::').pop()}</span><span class="lb">${e.kind}${e.label?': '+e.label:''}</span></li>`;
     });
-    applyFilters();
+    h+=`</ul></div>`;
   }
 
-  // ──── Render Graph ────
-  function renderGraph() {
-    if (simulation) simulation.stop();
-    initSVG();
+  if(!incoming.length&&!outgoing.length)h+=`<div class="ds"><p class="ds-empty">No connections</p></div>`;
 
-    const width = svg.node().clientWidth;
-    const height = svg.node().clientHeight;
+  spBody.innerHTML=h;
+}
 
-    // Build visible sets
-    const visibleNodes = graphData.nodes.filter(n => activeTypes.has(n.type));
-    const visibleIds = new Set(visibleNodes.map(n => n.id));
-    const visibleEdges = graphData.edges.filter(e => visibleIds.has(e.source.id || e.source) && visibleIds.has(e.target.id || e.target));
+window._selById=function(id){const n=window._nodes?.find(n=>n.id===id);if(n)selectNode(n)};
 
-    // D3 data
-    const nodes = visibleNodes.map(n => ({...n, x: Math.random() * width, y: Math.random() * height}));
-    const nodeById = {};
-    nodes.forEach(n => nodeById[n.id] = n);
+// ── DRAG ──
+function dragS(e,d){if(!e.active)sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y}
+function dragM(e,d){d.fx=e.x;d.fy=e.y}
+function dragE(e,d){if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null}
 
-    const edges = visibleEdges.map(e => ({
-      ...e,
-      source: nodeById[e.source.id || e.source] || e.source,
-      target: nodeById[e.target.id || e.target] || e.target,
-    })).filter(e => e.source && e.target && nodeById[e.source.id || e.source] && nodeById[e.target.id || e.target]);
+// ── ZOOM ──
+$('zoomIn').onclick=()=>svg.transition().duration(300).call(zoom.scaleBy,1.4);
+$('zoomOut').onclick=()=>svg.transition().duration(300).call(zoom.scaleBy,.7);
+$('zoomReset').onclick=()=>{
+  svg.transition().duration(400).call(zoom.transform,d3.zoomIdentity);
+  setTimeout(()=>{const b=g.node().getBBox();if(!b.width)return;const W=svg.node().clientWidth,H=svg.node().clientHeight;const s=.75/Math.max(b.width/W,b.height/H);
+    svg.transition().duration(500).call(zoom.transform,d3.zoomIdentity.translate(W/2-s*(b.x+b.width/2),H/2-s*(b.y+b.height/2)).scale(s))},50);
+};
 
-    // ── Links ──
-    const links = linkGroup.selectAll('line')
-      .data(edges)
-      .join('line')
-      .attr('class', 'link')
-      .attr('stroke', d => EDGE_COLORS[d.type] || '#444')
-      .attr('stroke-width', d => d.type === 'import' ? 1.5 : 1)
-      .attr('stroke-dasharray', d => EDGE_DASH[d.type] || 'none')
-      .attr('marker-end', d => `url(#arrow-${d.type})`);
+// ── SIDE PANEL ──
+spClose.onclick=()=>{sp.classList.remove('open');selectedNode=null;_nodeGs?.selectAll('.node-c').classed('sel',false)};
 
-    // ── Nodes ──
-    const nodeGs = nodeGroup.selectAll('g')
-      .data(nodes, d => d.id)
-      .join('g')
-      .call(d3.drag()
-        .on('start', dragStarted)
-        .on('drag', dragged)
-        .on('end', dragEnded));
+// ── SEARCH ──
+searchIn.oninput=e=>{searchTerm=e.target.value;applySearch(searchTerm)};
 
-    nodeGs.append('circle')
-      .attr('class', 'node-circle')
-      .attr('r', d => NODE_RADIUS[d.type] || 6)
-      .attr('fill', d => NODE_COLORS[d.type] || '#888')
-      .on('click', (event, d) => selectNode(d))
-      .on('mouseenter', (event, d) => showTooltip(event, d))
-      .on('mouseleave', hideTooltip);
+// ── FILE INPUT ──
+browseBtn.onclick=()=>fileIn.click();
+loadBtn.onclick=()=>fileIn.click();
+fileIn.onchange=e=>{const f=e.target.files[0];if(f)readFile(f)};
 
-    // ── Labels ──
-    const labels = labelGroup.selectAll('text')
-      .data(nodes, d => d.id)
-      .join('text')
-      .attr('class', 'node-label')
-      .attr('dy', d => (NODE_RADIUS[d.type] || 6) + 12)
-      .text(d => {
-        const parts = d.path.split('/');
-        return parts[parts.length - 1].replace(/\.(js|jsx|ts|tsx)$/, '');
-      });
+// ── DRAG & DROP ──
+document.ondragover=e=>{e.preventDefault();dropOv.classList.remove('hidden')};
+dropOv.ondragover=e=>e.preventDefault();
+dropOv.ondragleave=e=>{if(!dropOv.contains(e.relatedTarget))dropOv.classList.add('hidden')};
+dropOv.ondrop=e=>{e.preventDefault();dropOv.classList.add('hidden');const f=e.dataTransfer.files[0];if(f&&f.name.endsWith('.json'))readFile(f)};
 
-    // ── Simulation ──
-    simulation = d3.forceSimulation(nodes)
-      .force('link', d3.forceLink(edges).id(d => d.id).distance(d => {
-        if (d.type === 'api') return 120;
-        if (d.type === 'jsx') return 80;
-        return 60;
-      }).strength(0.4))
-      .force('charge', d3.forceManyBody().strength(d => {
-        const r = NODE_RADIUS[d.type] || 6;
-        return -r * 40;
-      }))
-      .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide().radius(d => (NODE_RADIUS[d.type] || 6) + 8))
-      .force('x', d3.forceX(width / 2).strength(0.03))
-      .force('y', d3.forceY(height / 2).strength(0.03))
-      .alphaDecay(0.02)
-      .on('tick', ticked);
+function readFile(file){
+  const r=new FileReader();
+  r.onload=e=>{try{const d=JSON.parse(e.target.result);if(d.nodes&&d.edges)loadData(d);else alert('Invalid graph.json')}catch(err){alert('Parse error: '+err.message)}};
+  r.readAsText(file);
+}
 
-    function ticked() {
-      links
-        .attr('x1', d => d.source.x)
-        .attr('y1', d => d.source.y)
-        .attr('x2', d => d.target.x)
-        .attr('y2', d => d.target.y);
-
-      nodeGs.attr('transform', d => `translate(${d.x},${d.y})`);
-
-      labels
-        .attr('x', d => d.x)
-        .attr('y', d => d.y);
-    }
-
-    // Store references for filtering
-    window._nodes = nodes;
-    window._edges = edges;
-    window._links = links;
-    window._nodeGs = nodeGs;
-    window._labels = labels;
-
-    // Initial zoom to fit
-    setTimeout(() => {
-      const bounds = g.node().getBBox();
-      if (bounds.width === 0) return;
-      const fullWidth = svg.node().clientWidth;
-      const fullHeight = svg.node().clientHeight;
-      const scale = 0.8 / Math.max(bounds.width / fullWidth, bounds.height / fullHeight);
-      const midX = bounds.x + bounds.width / 2;
-      const midY = bounds.y + bounds.height / 2;
-      svg.transition().duration(600).call(
-        zoomBehavior.transform,
-        d3.zoomIdentity.translate(fullWidth / 2 - scale * midX, fullHeight / 2 - scale * midY).scale(scale)
-      );
-    }, 1500);
-  }
-
-  // ──── Filters ────
-  function applyFilters() {
-    renderGraph();
-    if (searchTerm) applySearch(searchTerm);
-  }
-
-  // ──── Search ────
-  function applySearch(term) {
-    term = term.toLowerCase();
-    const nodes = window._nodeGs;
-    const labels = window._labels;
-    const links = window._links;
-
-    if (!term) {
-      nodes.selectAll('.node-circle').classed('highlighted', false).classed('dimmed', false);
-      labels.classed('highlighted', false).classed('dimmed', false);
-      links.classed('highlighted', false).classed('dimmed', false);
-      return;
-    }
-
-    const matchingIds = new Set();
-    graphData.nodes.forEach(n => {
-      if (n.path.toLowerCase().includes(term) ||
-          n.id.toLowerCase().includes(term) ||
-          (n.exports && n.exports.some(e => e.toLowerCase().includes(term))) ||
-          (n.reactComponents && n.reactComponents.some(c => c.toLowerCase().includes(term)))) {
-        matchingIds.add(n.id);
-      }
-    });
-
-    nodes.selectAll('.node-circle')
-      .classed('highlighted', d => matchingIds.has(d.id))
-      .classed('dimmed', d => !matchingIds.has(d.id));
-
-    labels
-      .classed('highlighted', d => matchingIds.has(d.id))
-      .classed('dimmed', d => !matchingIds.has(d.id));
-
-    links
-      .classed('highlighted', d => matchingIds.has(d.source.id || d.source) || matchingIds.has(d.target.id || d.target))
-      .classed('dimmed', d => !matchingIds.has(d.source.id || d.source) && !matchingIds.has(d.target.id || d.target));
-  }
-
-  // ──── Select Node ────
-  function selectNode(d) {
-    selectedNode = d;
-
-    // Highlight in graph
-    window._nodeGs.selectAll('.node-circle')
-      .classed('selected', n => n.id === d.id);
-
-    // Open side panel
-    renderSidePanel(d);
-    sidePanel.classList.add('open');
-  }
-
-  function renderSidePanel(d) {
-    const color = NODE_COLORS[d.type] || '#888';
-    const icon = NODE_ICONS[d.type] || '📄';
-    const fileName = d.path.split('/').pop();
-    const dirName = d.path.split('/').slice(0, -1).join('/') || '.';
-
-    sidePanelTitle.innerHTML = `<span style="font-size:16px">${icon}</span> ${fileName}`;
-
-    const incoming = graphData.edges.filter(e => (e.target.id || e.target) === d.id);
-    const outgoing = graphData.edges.filter(e => (e.source.id || e.source) === d.id);
-
-    let html = '';
-
-    // Type badge
-    html += `<div class="detail-section">
-      <h4>Type</h4>
-      <span class="detail-type-badge" style="background:${color}22;color:${color};border:1px solid ${color}44">
-        <span>${icon}</span> ${d.type}
-      </span>
-    </div>`;
-
-    // Path
-    html += `<div class="detail-section">
-      <h4>File Path</h4>
-      <div class="detail-path">${d.path}</div>
-    </div>`;
-
-    // Lines of code
-    if (d.linesOfCode) {
-      html += `<div class="detail-section">
-        <h4>Size</h4>
-        <div class="detail-loc">${d.linesOfCode} lines of code</div>
-      </div>`;
-    }
-
-    // Exports
-    if (d.exports && d.exports.length > 0) {
-      html += `<div class="detail-section">
-        <h4>Exports (${d.exports.length})</h4>
-        <ul class="detail-list">
-          ${d.exports.map(e => `<li><span class="name">${e}</span></li>`).join('')}
-        </ul>
-      </div>`;
-    }
-
-    // React Components
-    if (d.reactComponents && d.reactComponents.length > 0) {
-      html += `<div class="detail-section">
-        <h4>React Components (${d.reactComponents.length})</h4>
-        <ul class="detail-list">
-          ${d.reactComponents.map(c => `<li><span style="color:${NODE_COLORS.component}">🧩</span> <span class="name">${c}</span></li>`).join('')}
-        </ul>
-      </div>`;
-    }
-
-    // API Calls
-    if (d.apiCalls && d.apiCalls.length > 0) {
-      html += `<div class="detail-section">
-        <h4>API Calls (${d.apiCalls.length})</h4>
-        <ul class="detail-list">
-          ${d.apiCalls.map(a => {
-            const method = (a.method || 'GET').toLowerCase();
-            return `<li>
-              <span class="api-badge ${method}">${a.method || 'GET'}</span>
-              <span class="name">${a.url || a.type}</span>
-              <span class="label">${a.type}</span>
-            </li>`;
-          }).join('')}
-        </ul>
-      </div>`;
-    }
-
-    // Function Definitions
-    if (d.functionDefs && d.functionDefs.length > 0) {
-      html += `<div class="detail-section">
-        <h4>Functions (${d.functionDefs.length})</h4>
-        <ul class="detail-list">
-          ${d.functionDefs.map(f => `<li><span class="arrow">→</span> <span class="name">${f.name}</span> <span class="label">${f.type}</span></li>`).join('')}
-        </ul>
-      </div>`;
-    }
-
-    // Incoming connections
-    if (incoming.length > 0) {
-      html += `<div class="detail-section">
-        <h4>Incoming (${incoming.length})</h4>
-        <ul class="detail-list">
-          ${incoming.map(e => {
-            const src = e.source.id || e.source;
-            const srcNode = nodeMap[src];
-            const srcColor = srcNode ? NODE_COLORS[srcNode.type] || '#888' : '#888';
-            return `<li data-node-id="${src}" onclick="window._selectById('${src}')">
-              <span class="arrow">←</span>
-              <span style="color:${srcColor}">●</span>
-              <span class="name">${src.split('/').pop()}</span>
-              <span class="label">${e.type}${e.label ? ': ' + e.label : ''}</span>
-            </li>`;
-          }).join('')}
-        </ul>
-      </div>`;
-    }
-
-    // Outgoing connections
-    if (outgoing.length > 0) {
-      html += `<div class="detail-section">
-        <h4>Outgoing (${outgoing.length})</h4>
-        <ul class="detail-list">
-          ${outgoing.map(e => {
-            const tgt = e.target.id || e.target;
-            const tgtNode = nodeMap[tgt];
-            const tgtColor = tgtNode ? NODE_COLORS[tgtNode.type] || '#888' : '#888';
-            return `<li data-node-id="${tgt}" onclick="window._selectById('${tgt}')">
-              <span class="arrow">→</span>
-              <span style="color:${tgtColor}">●</span>
-              <span class="name">${tgt.split('/').pop()}</span>
-              <span class="label">${e.type}${e.label ? ': ' + e.label : ''}</span>
-            </li>`;
-          }).join('')}
-        </ul>
-      </div>`;
-    }
-
-    if (!incoming.length && !outgoing.length) {
-      html += `<div class="detail-section"><p class="detail-empty">No connections</p></div>`;
-    }
-
-    sidePanelBody.innerHTML = html;
-  }
-
-  // Global click handler for side panel links
-  window._selectById = function(id) {
-    const node = window._nodes.find(n => n.id === id);
-    if (node) selectNode(node);
-  };
-
-  // ──── Tooltip ────
-  function showTooltip(event, d) {
-    const icon = NODE_ICONS[d.type] || '📄';
-    ttName.textContent = `${icon} ${d.path.split('/').pop()}`;
-    ttType.textContent = d.type;
-    ttPath.textContent = d.path;
-    tooltip.classList.add('visible');
-    positionTooltip(event);
-  }
-
-  function positionTooltip(event) {
-    const x = event.clientX + 12;
-    const y = event.clientY - 10;
-    tooltip.style.left = x + 'px';
-    tooltip.style.top = y + 'px';
-  }
-
-  function hideTooltip() {
-    tooltip.classList.remove('visible');
-  }
-
-  // ──── Drag ────
-  function dragStarted(event, d) {
-    if (!event.active) simulation.alphaTarget(0.3).restart();
-    d.fx = d.x;
-    d.fy = d.y;
-  }
-
-  function dragged(event, d) {
-    d.fx = event.x;
-    d.fy = event.y;
-  }
-
-  function dragEnded(event, d) {
-    if (!event.active) simulation.alphaTarget(0);
-    d.fx = null;
-    d.fy = null;
-  }
-
-  // ──── Zoom Controls ────
-  document.getElementById('zoomIn').addEventListener('click', () => {
-    svg.transition().duration(300).call(zoomBehavior.scaleBy, 1.4);
-  });
-
-  document.getElementById('zoomOut').addEventListener('click', () => {
-    svg.transition().duration(300).call(zoomBehavior.scaleBy, 0.7);
-  });
-
-  document.getElementById('zoomReset').addEventListener('click', () => {
-    svg.transition().duration(500).call(zoomBehavior.transform, d3.zoomIdentity);
-    setTimeout(() => {
-      const bounds = g.node().getBBox();
-      if (bounds.width === 0) return;
-      const fullWidth = svg.node().clientWidth;
-      const fullHeight = svg.node().clientHeight;
-      const scale = 0.8 / Math.max(bounds.width / fullWidth, bounds.height / fullHeight);
-      const midX = bounds.x + bounds.width / 2;
-      const midY = bounds.y + bounds.height / 2;
-      svg.transition().duration(600).call(
-        zoomBehavior.transform,
-        d3.zoomIdentity.translate(fullWidth / 2 - scale * midX, fullHeight / 2 - scale * midY).scale(scale)
-      );
-    }, 100);
-  });
-
-  // ──── Side Panel Close ────
-  sidePanelClose.addEventListener('click', () => {
-    sidePanel.classList.remove('open');
-    selectedNode = null;
-    window._nodeGs?.selectAll('.node-circle').classed('selected', false);
-  });
-
-  // ──── Search ────
-  searchInput.addEventListener('input', (e) => {
-    searchTerm = e.target.value;
-    applySearch(searchTerm);
-  });
-
-  // ──── File Input ────
-  browseBtn.addEventListener('click', () => fileInput.click());
-  loadNewBtn.addEventListener('click', () => fileInput.click());
-
-  fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) readFile(file);
-  });
-
-  // ──── Drag & Drop ────
-  document.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropOverlay.classList.remove('hidden');
-  });
-
-  dropOverlay.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropOverlay.classList.add('active-drag');
-  });
-
-  dropOverlay.addEventListener('dragleave', (e) => {
-    if (!dropOverlay.contains(e.relatedTarget)) {
-      dropOverlay.classList.add('hidden');
-    }
-  });
-
-  dropOverlay.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dropOverlay.classList.add('hidden');
-    const file = e.dataTransfer.files[0];
-    if (file && file.name.endsWith('.json')) {
-      readFile(file);
-    }
-  });
-
-  function readFile(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target.result);
-        if (data.nodes && data.edges) {
-          loadData(data);
-        } else {
-          alert('Invalid graph.json format. Expected { nodes, edges }.');
-        }
-      } catch (err) {
-        alert('Failed to parse JSON: ' + err.message);
-      }
-    };
-    reader.readAsText(file);
-  }
-
-  // ──── Resize ────
-  window.addEventListener('resize', () => {
-    if (simulation) {
-      const width = svg.node().clientWidth;
-      const height = svg.node().clientHeight;
-      simulation.force('center', d3.forceCenter(width / 2, height / 2));
-      simulation.alpha(0.3).restart();
-    }
-  });
+// ── RESIZE ──
+window.onresize=()=>{if(sim){const W=svg.node().clientWidth,H=svg.node().clientHeight;sim.force('center',d3.forceCenter(W/2,H/2));sim.alpha(.3).restart()}};
 
 })();
 </script>
