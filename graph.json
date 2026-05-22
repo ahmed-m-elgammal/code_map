@@ -1,0 +1,1103 @@
+{
+  "nodes": [
+    {
+      "id": "analyze.js",
+      "type": "file",
+      "path": "analyze.js",
+      "exports": [],
+      "linesOfCode": 806,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/ASR/scripts/asr.ts",
+      "type": "file",
+      "path": "skills/ASR/scripts/asr.ts",
+      "exports": [],
+      "linesOfCode": 28,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/LLM/scripts/chat.ts",
+      "type": "file",
+      "path": "skills/LLM/scripts/chat.ts",
+      "exports": [],
+      "linesOfCode": 33,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/TTS/tts.ts",
+      "type": "file",
+      "path": "skills/TTS/tts.ts",
+      "exports": [],
+      "linesOfCode": 26,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/VLM/scripts/vlm.ts",
+      "type": "file",
+      "path": "skills/VLM/scripts/vlm.ts",
+      "exports": [],
+      "linesOfCode": 58,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/image-edit/scripts/image-edit.ts",
+      "type": "file",
+      "path": "skills/image-edit/scripts/image-edit.ts",
+      "exports": [],
+      "linesOfCode": 37,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/image-generation/scripts/image-generation.ts",
+      "type": "file",
+      "path": "skills/image-generation/scripts/image-generation.ts",
+      "exports": [],
+      "linesOfCode": 29,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/image-understand/scripts/image-understand.ts",
+      "type": "file",
+      "path": "skills/image-understand/scripts/image-understand.ts",
+      "exports": [],
+      "linesOfCode": 42,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/pdf/scripts/cover_validate.js",
+      "type": "file",
+      "path": "skills/pdf/scripts/cover_validate.js",
+      "exports": [],
+      "linesOfCode": 368,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/pdf/scripts/html2pdf-next.js",
+      "type": "file",
+      "path": "skills/pdf/scripts/html2pdf-next.js",
+      "exports": [],
+      "linesOfCode": 755,
+      "reactComponents": [],
+      "functionDefs": [
+        {
+          "name": "sleep",
+          "type": "arrow",
+          "line": 27
+        }
+      ],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/pdf/scripts/html2poster.js",
+      "type": "file",
+      "path": "skills/pdf/scripts/html2poster.js",
+      "exports": [],
+      "linesOfCode": 257,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/podcast-generate/generate.ts",
+      "type": "file",
+      "path": "skills/podcast-generate/generate.ts",
+      "exports": [],
+      "linesOfCode": 662,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/ppt/scripts/html2pptx.js",
+      "type": "file",
+      "path": "skills/ppt/scripts/html2pptx.js",
+      "exports": [],
+      "linesOfCode": 1337,
+      "reactComponents": [],
+      "functionDefs": [
+        {
+          "name": "getText",
+          "type": "arrow",
+          "line": 279
+        },
+        {
+          "name": "shouldSkipBold",
+          "type": "arrow",
+          "line": 445
+        },
+        {
+          "name": "hasCJKChars",
+          "type": "arrow",
+          "line": 463
+        },
+        {
+          "name": "mapFontFace",
+          "type": "arrow",
+          "line": 511
+        },
+        {
+          "name": "pxToInch",
+          "type": "arrow",
+          "line": 541
+        },
+        {
+          "name": "pxToPoints",
+          "type": "arrow",
+          "line": 542
+        },
+        {
+          "name": "rgbToHex",
+          "type": "arrow",
+          "line": 543
+        },
+        {
+          "name": "extractAlpha",
+          "type": "arrow",
+          "line": 552
+        },
+        {
+          "name": "applyTextTransform",
+          "type": "arrow",
+          "line": 559
+        },
+        {
+          "name": "getRotation",
+          "type": "arrow",
+          "line": 569
+        },
+        {
+          "name": "getPositionAndSize",
+          "type": "arrow",
+          "line": 609
+        },
+        {
+          "name": "parseBoxShadow",
+          "type": "arrow",
+          "line": 645
+        },
+        {
+          "name": "parseInlineFormatting",
+          "type": "arrow",
+          "line": 699
+        }
+      ],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/stock-analysis-skill/src/analyzer.ts",
+      "type": "file",
+      "path": "skills/stock-analysis-skill/src/analyzer.ts",
+      "exports": [
+        "analyzeStock",
+        "analyzeMultipleStocks",
+        "analyzeChartImage"
+      ],
+      "linesOfCode": 265,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/stock-analysis-skill/src/dataFetcher.ts",
+      "type": "file",
+      "path": "skills/stock-analysis-skill/src/dataFetcher.ts",
+      "exports": [
+        "detectMarket",
+        "fetchStockData",
+        "fetchMultipleStocks",
+        "fetchGlobalMacro",
+        "fetchMarketOverview",
+        "validateStockData"
+      ],
+      "linesOfCode": 131,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/stock-analysis-skill/src/dividend.ts",
+      "type": "file",
+      "path": "skills/stock-analysis-skill/src/dividend.ts",
+      "exports": [
+        "analyzeDividend",
+        "formatDividendMarkdown",
+        "analyzeDividends"
+      ],
+      "linesOfCode": 227,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/stock-analysis-skill/src/index.ts",
+      "type": "file",
+      "path": "skills/stock-analysis-skill/src/index.ts",
+      "exports": [
+        "run",
+        "runDividend",
+        "runRumorScan",
+        "runWatchlistAdd",
+        "runWatchlistRemove",
+        "runWatchlistList",
+        "runWatchlistCheck",
+        "runChartAnalysis"
+      ],
+      "linesOfCode": 328,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/stock-analysis-skill/src/rumorScanner.ts",
+      "type": "file",
+      "path": "skills/stock-analysis-skill/src/rumorScanner.ts",
+      "exports": [
+        "scanRumors",
+        "formatRumorMarkdown"
+      ],
+      "linesOfCode": 201,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/stock-analysis-skill/src/types.ts",
+      "type": "file",
+      "path": "skills/stock-analysis-skill/src/types.ts",
+      "exports": [],
+      "linesOfCode": 168,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/stock-analysis-skill/src/watchlist.ts",
+      "type": "file",
+      "path": "skills/stock-analysis-skill/src/watchlist.ts",
+      "exports": [
+        "addToWatchlist",
+        "removeFromWatchlist",
+        "listWatchlist",
+        "checkAlerts",
+        "formatWatchlistMarkdown",
+        "formatAlertsMarkdown"
+      ],
+      "linesOfCode": 293,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/storyboard-manager/index.js",
+      "type": "file",
+      "path": "skills/storyboard-manager/index.js",
+      "exports": [
+        "storyboard_manager"
+      ],
+      "linesOfCode": 10,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/video-generation/scripts/video.ts",
+      "type": "file",
+      "path": "skills/video-generation/scripts/video.ts",
+      "exports": [],
+      "linesOfCode": 169,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/video-understand/scripts/video-understand.ts",
+      "type": "file",
+      "path": "skills/video-understand/scripts/video-understand.ts",
+      "exports": [],
+      "linesOfCode": 42,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/web-reader/scripts/web-reader.ts",
+      "type": "file",
+      "path": "skills/web-reader/scripts/web-reader.ts",
+      "exports": [],
+      "linesOfCode": 38,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "skills/web-search/scripts/web_search.ts",
+      "type": "file",
+      "path": "skills/web-search/scripts/web_search.ts",
+      "exports": [],
+      "linesOfCode": 45,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "pkg:fs",
+      "type": "package",
+      "path": "fs",
+      "exports": [],
+      "linesOfCode": 0,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "pkg:path",
+      "type": "package",
+      "path": "path",
+      "exports": [],
+      "linesOfCode": 0,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "pkg:@babel",
+      "type": "package",
+      "path": "@babel",
+      "exports": [],
+      "linesOfCode": 0,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "pkg:z-ai-web-dev-sdk",
+      "type": "package",
+      "path": "z-ai-web-dev-sdk",
+      "exports": [],
+      "linesOfCode": 0,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "pkg:playwright",
+      "type": "package",
+      "path": "playwright",
+      "exports": [],
+      "linesOfCode": 0,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "pkg:playwright-core",
+      "type": "package",
+      "path": "playwright-core",
+      "exports": [],
+      "linesOfCode": 0,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "pkg:child_process",
+      "type": "package",
+      "path": "child_process",
+      "exports": [],
+      "linesOfCode": 0,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "pkg:module",
+      "type": "package",
+      "path": "module",
+      "exports": [],
+      "linesOfCode": 0,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "pkg:pdf-lib",
+      "type": "package",
+      "path": "pdf-lib",
+      "exports": [],
+      "linesOfCode": 0,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "pkg:url",
+      "type": "package",
+      "path": "url",
+      "exports": [],
+      "linesOfCode": 0,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "pkg:os",
+      "type": "package",
+      "path": "os",
+      "exports": [],
+      "linesOfCode": 0,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    },
+    {
+      "id": "pkg:sharp",
+      "type": "package",
+      "path": "sharp",
+      "exports": [],
+      "linesOfCode": 0,
+      "reactComponents": [],
+      "functionDefs": [],
+      "apiCalls": []
+    }
+  ],
+  "edges": [
+    {
+      "source": "analyze.js",
+      "target": "pkg:fs",
+      "type": "external",
+      "label": "default",
+      "line": 15
+    },
+    {
+      "source": "analyze.js",
+      "target": "pkg:path",
+      "type": "external",
+      "label": "default",
+      "line": 16
+    },
+    {
+      "source": "analyze.js",
+      "target": "pkg:@babel",
+      "type": "external",
+      "label": "default",
+      "line": 17
+    },
+    {
+      "source": "analyze.js",
+      "target": "pkg:@babel",
+      "type": "external",
+      "label": "default",
+      "line": 18
+    },
+    {
+      "source": "analyze.js",
+      "target": "pkg:@babel",
+      "type": "external",
+      "label": "default",
+      "line": 19
+    },
+    {
+      "source": "skills/ASR/scripts/asr.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default",
+      "line": 1
+    },
+    {
+      "source": "skills/ASR/scripts/asr.ts",
+      "target": "pkg:fs",
+      "type": "external",
+      "label": "default",
+      "line": 2
+    },
+    {
+      "source": "skills/ASR/scripts/asr.ts",
+      "target": "pkg:path",
+      "type": "external",
+      "label": "default",
+      "line": 3
+    },
+    {
+      "source": "skills/LLM/scripts/chat.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default, ChatMessage",
+      "line": 1
+    },
+    {
+      "source": "skills/TTS/tts.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default",
+      "line": 1
+    },
+    {
+      "source": "skills/TTS/tts.ts",
+      "target": "pkg:fs",
+      "type": "external",
+      "label": "default",
+      "line": 2
+    },
+    {
+      "source": "skills/VLM/scripts/vlm.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default, VisionMessage",
+      "line": 1
+    },
+    {
+      "source": "skills/image-edit/scripts/image-edit.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default",
+      "line": 1
+    },
+    {
+      "source": "skills/image-edit/scripts/image-edit.ts",
+      "target": "pkg:fs",
+      "type": "external",
+      "label": "default",
+      "line": 2
+    },
+    {
+      "source": "skills/image-generation/scripts/image-generation.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default",
+      "line": 1
+    },
+    {
+      "source": "skills/image-generation/scripts/image-generation.ts",
+      "target": "pkg:fs",
+      "type": "external",
+      "label": "default",
+      "line": 2
+    },
+    {
+      "source": "skills/image-understand/scripts/image-understand.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default, VisionMessage",
+      "line": 1
+    },
+    {
+      "source": "skills/pdf/scripts/cover_validate.js",
+      "target": "pkg:fs",
+      "type": "external",
+      "label": "default",
+      "line": 28
+    },
+    {
+      "source": "skills/pdf/scripts/cover_validate.js",
+      "target": "pkg:path",
+      "type": "external",
+      "label": "default",
+      "line": 29
+    },
+    {
+      "source": "skills/pdf/scripts/cover_validate.js",
+      "target": "pkg:playwright",
+      "type": "external",
+      "label": "default",
+      "line": 35
+    },
+    {
+      "source": "skills/pdf/scripts/cover_validate.js",
+      "target": "pkg:playwright-core",
+      "type": "external",
+      "label": "default",
+      "line": 38
+    },
+    {
+      "source": "skills/pdf/scripts/html2pdf-next.js",
+      "target": "pkg:fs",
+      "type": "external",
+      "label": "default",
+      "line": 23
+    },
+    {
+      "source": "skills/pdf/scripts/html2pdf-next.js",
+      "target": "pkg:path",
+      "type": "external",
+      "label": "default",
+      "line": 24
+    },
+    {
+      "source": "skills/pdf/scripts/html2pdf-next.js",
+      "target": "pkg:child_process",
+      "type": "external",
+      "label": "default",
+      "line": 25
+    },
+    {
+      "source": "skills/pdf/scripts/html2pdf-next.js",
+      "target": "pkg:playwright",
+      "type": "external",
+      "label": "default",
+      "line": 35
+    },
+    {
+      "source": "skills/pdf/scripts/html2pdf-next.js",
+      "target": "pkg:module",
+      "type": "external",
+      "label": "default",
+      "line": 38
+    },
+    {
+      "source": "skills/pdf/scripts/html2pdf-next.js",
+      "target": "pkg:pdf-lib",
+      "type": "external",
+      "label": "default",
+      "line": 58
+    },
+    {
+      "source": "skills/pdf/scripts/html2pdf-next.js",
+      "target": "pkg:module",
+      "type": "external",
+      "label": "default",
+      "line": 59
+    },
+    {
+      "source": "skills/pdf/scripts/html2poster.js",
+      "target": "pkg:fs",
+      "type": "external",
+      "label": "default",
+      "line": 34
+    },
+    {
+      "source": "skills/pdf/scripts/html2poster.js",
+      "target": "pkg:path",
+      "type": "external",
+      "label": "default",
+      "line": 35
+    },
+    {
+      "source": "skills/pdf/scripts/html2poster.js",
+      "target": "pkg:child_process",
+      "type": "external",
+      "label": "default",
+      "line": 36
+    },
+    {
+      "source": "skills/pdf/scripts/html2poster.js",
+      "target": "pkg:playwright",
+      "type": "external",
+      "label": "default",
+      "line": 118
+    },
+    {
+      "source": "skills/pdf/scripts/html2poster.js",
+      "target": "pkg:playwright-core",
+      "type": "external",
+      "label": "default",
+      "line": 121
+    },
+    {
+      "source": "skills/podcast-generate/generate.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default",
+      "line": 13
+    },
+    {
+      "source": "skills/podcast-generate/generate.ts",
+      "target": "pkg:fs",
+      "type": "external",
+      "label": "default",
+      "line": 14
+    },
+    {
+      "source": "skills/podcast-generate/generate.ts",
+      "target": "pkg:path",
+      "type": "external",
+      "label": "default",
+      "line": 15
+    },
+    {
+      "source": "skills/podcast-generate/generate.ts",
+      "target": "pkg:url",
+      "type": "external",
+      "label": "fileURLToPath",
+      "line": 16
+    },
+    {
+      "source": "skills/podcast-generate/generate.ts",
+      "target": "pkg:os",
+      "type": "external",
+      "label": "default",
+      "line": 17
+    },
+    {
+      "source": "skills/ppt/scripts/html2pptx.js",
+      "target": "pkg:playwright",
+      "type": "external",
+      "label": "default",
+      "line": 40
+    },
+    {
+      "source": "skills/ppt/scripts/html2pptx.js",
+      "target": "pkg:path",
+      "type": "external",
+      "label": "default",
+      "line": 41
+    },
+    {
+      "source": "skills/ppt/scripts/html2pptx.js",
+      "target": "pkg:sharp",
+      "type": "external",
+      "label": "default",
+      "line": 42
+    },
+    {
+      "source": "skills/ppt/scripts/html2pptx.js",
+      "target": "pkg:fs",
+      "type": "external",
+      "label": "default",
+      "line": 43
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/analyzer.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default",
+      "line": 6
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/analyzer.ts",
+      "target": "skills/stock-analysis-skill/src/types.ts",
+      "type": "import",
+      "label": "StockData, AnalysisResult, OutputFormat, Market, Verdict, PositionInfo",
+      "line": 7
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/analyzer.ts",
+      "target": "skills/stock-analysis-skill/src/dataFetcher.ts",
+      "type": "import",
+      "label": "validateStockData",
+      "line": 8
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/analyzer.ts",
+      "target": "skills/stock-analysis-skill/src/dividend.ts",
+      "type": "import",
+      "label": "analyzeDividend, formatDividendMarkdown",
+      "line": 9
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/analyzer.ts",
+      "target": "skills/stock-analysis-skill/src/dataFetcher.ts",
+      "type": "call",
+      "label": "analyzeStock → validateStockData",
+      "line": 169
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/analyzer.ts",
+      "target": "skills/stock-analysis-skill/src/dividend.ts",
+      "type": "call",
+      "label": "analyzeStock → analyzeDividend",
+      "line": 204
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/analyzer.ts",
+      "target": "skills/stock-analysis-skill/src/dividend.ts",
+      "type": "call",
+      "label": "analyzeStock → formatDividendMarkdown",
+      "line": 205
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/dataFetcher.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default",
+      "line": 5
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/dataFetcher.ts",
+      "target": "skills/stock-analysis-skill/src/types.ts",
+      "type": "import",
+      "label": "Market, FetchMode, StockData",
+      "line": 6
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/dividend.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default",
+      "line": 7
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/dividend.ts",
+      "target": "skills/stock-analysis-skill/src/types.ts",
+      "type": "import",
+      "label": "DividendAnalysis, PayoutStatus, IncomeRating",
+      "line": 8
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default",
+      "line": 15
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/dataFetcher.ts",
+      "type": "import",
+      "label": "fetchMultipleStocks, fetchMarketOverview, fetchGlobalMacro",
+      "line": 16
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/analyzer.ts",
+      "type": "import",
+      "label": "analyzeMultipleStocks, analyzeChartImage",
+      "line": 17
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/dividend.ts",
+      "type": "import",
+      "label": "analyzeDividends, formatDividendMarkdown",
+      "line": 18
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/rumorScanner.ts",
+      "type": "import",
+      "label": "scanRumors, formatRumorMarkdown",
+      "line": 19
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/watchlist.ts",
+      "type": "import",
+      "label": "addToWatchlist, removeFromWatchlist, listWatchlist, checkAlerts, formatWatchlistMarkdown, formatAlertsMarkdown",
+      "line": 20
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/types.ts",
+      "type": "import",
+      "label": "SkillInput, StockInput, OutputFormat, AnalysisResult, PositionInfo, Verdict",
+      "line": 25
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/dataFetcher.ts",
+      "type": "call",
+      "label": "run → fetchGlobalMacro",
+      "line": 141
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/dataFetcher.ts",
+      "type": "call",
+      "label": "run → fetchMarketOverview",
+      "line": 142
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/dataFetcher.ts",
+      "type": "call",
+      "label": "run → fetchMultipleStocks",
+      "line": 148
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/analyzer.ts",
+      "type": "call",
+      "label": "run → analyzeMultipleStocks",
+      "line": 156
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/watchlist.ts",
+      "type": "call",
+      "label": "run → checkAlerts",
+      "line": 161
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/dividend.ts",
+      "type": "call",
+      "label": "runDividend → analyzeDividends",
+      "line": 194
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/dividend.ts",
+      "type": "call",
+      "label": "runDividend → formatDividendMarkdown",
+      "line": 197
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/rumorScanner.ts",
+      "type": "call",
+      "label": "runRumorScan → scanRumors",
+      "line": 208
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/rumorScanner.ts",
+      "type": "call",
+      "label": "runRumorScan → formatRumorMarkdown",
+      "line": 209
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/watchlist.ts",
+      "type": "call",
+      "label": "runWatchlistAdd → addToWatchlist",
+      "line": 220
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/watchlist.ts",
+      "type": "call",
+      "label": "runWatchlistRemove → removeFromWatchlist",
+      "line": 225
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/watchlist.ts",
+      "type": "call",
+      "label": "runWatchlistList → listWatchlist",
+      "line": 230
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/watchlist.ts",
+      "type": "call",
+      "label": "runWatchlistList → formatWatchlistMarkdown",
+      "line": 231
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/watchlist.ts",
+      "type": "call",
+      "label": "runWatchlistCheck → checkAlerts",
+      "line": 235
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/watchlist.ts",
+      "type": "call",
+      "label": "runWatchlistCheck → formatAlertsMarkdown",
+      "line": 236
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/index.ts",
+      "target": "skills/stock-analysis-skill/src/analyzer.ts",
+      "type": "call",
+      "label": "runChartAnalysis → analyzeChartImage",
+      "line": 249
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/rumorScanner.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default",
+      "line": 9
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/rumorScanner.ts",
+      "target": "skills/stock-analysis-skill/src/types.ts",
+      "type": "import",
+      "label": "RumorItem, RumorScanResult, RumorType",
+      "line": 10
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/watchlist.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default",
+      "line": 7
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/watchlist.ts",
+      "target": "skills/stock-analysis-skill/src/types.ts",
+      "type": "import",
+      "label": "WatchlistItem, WatchlistAlert, Market, Verdict",
+      "line": 8
+    },
+    {
+      "source": "skills/stock-analysis-skill/src/watchlist.ts",
+      "target": "skills/stock-analysis-skill/src/dataFetcher.ts",
+      "type": "call",
+      "label": "addToWatchlist → detectMarket",
+      "line": 93
+    },
+    {
+      "source": "skills/video-generation/scripts/video.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default",
+      "line": 1
+    },
+    {
+      "source": "skills/video-generation/scripts/video.ts",
+      "target": "pkg:fs",
+      "type": "external",
+      "label": "default",
+      "line": 2
+    },
+    {
+      "source": "skills/video-understand/scripts/video-understand.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default, VisionMessage",
+      "line": 1
+    },
+    {
+      "source": "skills/web-reader/scripts/web-reader.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default",
+      "line": 1
+    },
+    {
+      "source": "skills/web-search/scripts/web_search.ts",
+      "target": "pkg:z-ai-web-dev-sdk",
+      "type": "external",
+      "label": "default",
+      "line": 1
+    }
+  ],
+  "stats": {
+    "totalFiles": 25,
+    "totalLines": 6355,
+    "nodeTypes": {
+      "file": 25,
+      "package": 12
+    },
+    "edgeTypes": {
+      "external": 53,
+      "import": 13,
+      "call": 20
+    },
+    "reactComponents": 0,
+    "hooks": 0,
+    "apiCalls": 0,
+    "imports": 66
+  }
+}
