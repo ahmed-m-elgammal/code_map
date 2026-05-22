@@ -1,0 +1,26 @@
+{
+  "name": "codemap",
+  "version": "3.0.0",
+  "description": "Interactive codebase graph visualizer with workflow tracing",
+  "main": "analyze.js",
+  "scripts": {
+    "analyze": "node analyze.js",
+    "traces": "node analyze.js --traces",
+    "init-traces": "node analyze.js --init-traces"
+  },
+  "keywords": [
+    "code-visualization",
+    "dependency-graph",
+    "static-analysis",
+    "react-native",
+    "codebase-map",
+    "workflow-tracing"
+  ],
+  "author": "Ahmed M. Elgammal",
+  "license": "MIT",
+  "dependencies": {
+    "@babel/parser": "^7.27.0",
+    "@babel/traverse": "^7.27.0",
+    "@babel/types": "^7.27.0"
+  }
+}

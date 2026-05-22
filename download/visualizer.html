@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CodeGraph Visualizer v2</title>
+<title>CodeGraph Visualizer v3</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -20,6 +20,8 @@
   --edge-import:#58a6ff;--edge-external:#d29922;--edge-jsx:#bc8cff;
   --edge-call:#3fb950;--edge-api_call:#ff7b72;--edge-contains:#484f58;
   --edge-extends:#f0883e;--edge-references:#56d4dd;
+  --trace-1:#ff6b6b;--trace-2:#ffd93d;--trace-3:#6bcb77;--trace-4:#4d96ff;
+  --trace-5:#ff922b;--trace-6:#cc5de8;--trace-7:#20c997;--trace-8:#845ef7;
   --r:8px;--shadow:0 8px 32px rgba(0,0,0,.5);
 }
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg0);color:var(--t1);height:100vh;overflow:hidden;display:flex;flex-direction:column}
@@ -38,6 +40,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .btn:hover{background:var(--bg4);border-color:var(--t3)}
 .btn-primary{background:#238636;border-color:#2ea043}.btn-primary:hover{background:#2ea043}
 .btn-sm{padding:4px 10px;font-size:11px}
+.btn-trace{background:rgba(255,107,107,.15);border-color:rgba(255,107,107,.3);color:var(--trace-1)}
+.btn-trace:hover{background:rgba(255,107,107,.25)}
+.btn-trace.active{background:rgba(255,107,107,.3);border-color:var(--trace-1);box-shadow:0 0 8px rgba(255,107,107,.3)}
 
 /* ── TOOLBAR ── */
 .toolbar{display:flex;align-items:center;gap:10px;padding:8px 20px;background:var(--bg2);border-bottom:1px solid var(--bd2);flex-shrink:0;flex-wrap:wrap}
@@ -89,7 +94,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .drop-box .or{color:var(--t4);margin:10px 0;font-size:11px;text-transform:uppercase;letter-spacing:1px}
 
 /* ── SIDE PANEL ── */
-.side-panel{position:absolute;top:0;right:0;width:380px;height:100%;background:var(--bg2);border-left:1px solid var(--bd2);z-index:50;transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;overflow:hidden}
+.side-panel{position:absolute;top:0;right:0;width:400px;height:100%;background:var(--bg2);border-left:1px solid var(--bd2);z-index:50;transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;overflow:hidden}
 .side-panel.open{transform:translateX(0)}
 .sp-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--bd2);flex-shrink:0}
 .sp-header h3{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
@@ -120,6 +125,58 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .metric-card .val{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
 .metric-card .lbl{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
 
+/* ── TRACE PANEL ── */
+.trace-panel{position:absolute;top:0;left:0;width:340px;height:100%;background:var(--bg2);border-right:1px solid var(--bd2);z-index:50;transform:translateX(-100%);transition:transform .22s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;overflow:hidden}
+.trace-panel.open{transform:translateX(0)}
+.tp-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--bd2);flex-shrink:0;background:linear-gradient(135deg,rgba(255,107,107,.08),rgba(255,107,107,.02))}
+.tp-header h3{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px}
+.tp-close{background:none;border:none;color:var(--t2);cursor:pointer;padding:4px;border-radius:4px;display:flex;align-items:center}
+.tp-close:hover{color:var(--t1);background:var(--bg4)}
+.tp-body{flex:1;overflow-y:auto;padding:0}
+.tp-body::-webkit-scrollbar{width:5px}.tp-body::-webkit-scrollbar-track{background:transparent}.tp-body::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+
+.trace-list{list-style:none;padding:0}
+.trace-item{padding:12px 14px;border-bottom:1px solid var(--bd2);cursor:pointer;transition:background .12s}
+.trace-item:hover{background:var(--bg3)}
+.trace-item.active{background:var(--bg4);border-left:3px solid var(--trace-1)}
+.trace-item .ti-name{font-size:13px;font-weight:600;margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.trace-item .ti-desc{font-size:10px;color:var(--t3);margin-bottom:6px;line-height:1.4}
+.trace-item .ti-stats{display:flex;gap:10px;font-size:10px;color:var(--t2)}
+.trace-item .ti-stats .ts-val{color:var(--t1);font-weight:600}
+
+/* ── TRACE DETAIL VIEW ── */
+.trace-detail{padding:14px}
+.td-back{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--blue);cursor:pointer;margin-bottom:12px;padding:4px 0}
+.td-back:hover{color:var(--t1)}
+.td-title{font-size:16px;font-weight:700;margin-bottom:4px}
+.td-desc{font-size:11px;color:var(--t2);margin-bottom:14px;line-height:1.5}
+.td-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:16px}
+.td-stat{background:var(--bg3);border-radius:6px;padding:8px;text-align:center}
+.td-stat .sv{font-size:18px;font-weight:700}
+.td-stat .sl{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+
+/* ── TRACE TIMELINE ── */
+.trace-timeline{margin-top:4px}
+.tt-step{display:flex;gap:10px;padding:8px 0;position:relative;cursor:pointer;transition:background .08s;border-radius:4px;padding-left:8px;padding-right:8px}
+.tt-step:hover{background:var(--bg3)}
+.tt-step.hl{background:rgba(255,107,107,.1);border-radius:4px}
+.tt-rail{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:20px;position:relative}
+.tt-dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--bd3);background:var(--bg2);z-index:1;flex-shrink:0}
+.tt-dot.entry{border-color:var(--green);background:var(--green);box-shadow:0 0 6px rgba(63,185,80,.4)}
+.tt-dot.exit{border-color:var(--red);background:var(--red);box-shadow:0 0 6px rgba(255,123,114,.4)}
+.tt-dot.api{border-color:var(--orange);background:var(--orange)}
+.tt-dot.store{border-color:var(--cyan);background:var(--cyan)}
+.tt-line{width:2px;flex:1;background:var(--bd3);min-height:12px}
+.tt-content{flex:1;min-width:0}
+.tt-name{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tt-meta{font-size:9px;color:var(--t3);display:flex;gap:6px;align-items:center;margin-top:2px}
+.tt-meta .edge-tag{background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:8px;font-weight:600;text-transform:uppercase}
+.tt-badge{font-size:8px;padding:1px 5px;border-radius:3px;font-weight:700;text-transform:uppercase}
+.tt-badge.entry{background:rgba(63,185,80,.15);color:var(--green)}
+.tt-badge.exit{background:rgba(255,123,114,.15);color:var(--red)}
+.tt-badge.api{background:rgba(240,136,62,.15);color:var(--orange)}
+.tt-badge.store{background:rgba(86,212,221,.15);color:var(--cyan)}
+
 /* ── ZOOM CONTROLS ── */
 .zoom-controls{position:absolute;bottom:16px;left:16px;display:flex;flex-direction:column;gap:3px;z-index:40}
 .zoom-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:var(--bg2);border:1px solid var(--bd2);border-radius:6px;color:var(--t2);cursor:pointer;font-size:15px;transition:all .12s}
@@ -139,14 +196,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 /* ── SVG ── */
 .link{fill:none;stroke-opacity:.2;transition:stroke-opacity .12s}
 .link.hl{stroke-opacity:.7}.link.dim{stroke-opacity:.04}
+.link.trace-hl{stroke-opacity:1;stroke-width:2.5;filter:drop-shadow(0 0 3px currentColor)}
 .node-c{stroke:var(--bg0);stroke-width:1.5;cursor:pointer;transition:stroke-width .1s}
 .node-c:hover{stroke-width:2.5}
 .node-c.sel{stroke:#fff;stroke-width:2.5}
 .node-c.hl{stroke-width:2.5;filter:drop-shadow(0 0 5px currentColor)}
 .node-c.dim{opacity:.12}
+.node-c.trace-hl{stroke-width:3;filter:drop-shadow(0 0 8px currentColor);stroke:#fff}
 .node-lbl{font-size:9px;fill:var(--t3);pointer-events:none;font-weight:500;text-anchor:middle}
 .node-lbl.hl{fill:var(--t1);font-weight:700;font-size:10px}
 .node-lbl.dim{opacity:.08}
+.node-lbl.trace-hl{fill:var(--t1);font-weight:700;font-size:11px}
 </style>
 </head>
 <body>
@@ -170,11 +230,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
         <circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
         <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
       </svg>
-      CodeGraph v2
+      CodeGraph v3
     </div>
     <div class="header-stats" id="headerStats"></div>
   </div>
   <div class="header-right">
+    <button class="btn btn-trace" id="traceToggleBtn">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Traces
+    </button>
     <button class="btn" id="loadNewBtn">Load New</button>
   </div>
 </div>
@@ -183,7 +247,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 <div class="toolbar" id="toolbar" style="display:none">
   <div class="search-box">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input type="text" id="searchInput" placeholder="Search nodes…">
+    <input type="text" id="searchInput" placeholder="Search nodes...">
   </div>
   <div class="view-tabs" id="viewTabs">
     <button class="view-tab active" data-view="all">All</button>
@@ -211,7 +275,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   <!-- Layer indicator -->
   <div class="layer-indicator" id="layerIndicator" style="display:none"></div>
 
-  <!-- Side panel -->
+  <!-- Trace panel (left) -->
+  <div class="trace-panel" id="tracePanel">
+    <div class="tp-header">
+      <h3>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Workflow Traces
+      </h3>
+      <button class="tp-close" id="tpClose"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="tp-body" id="tpBody"></div>
+  </div>
+
+  <!-- Side panel (right) -->
   <div class="side-panel" id="sidePanel">
     <div class="sp-header">
       <h3 id="spTitle">Details</h3>
@@ -223,7 +299,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   <!-- Zoom -->
   <div class="zoom-controls">
     <button class="zoom-btn" id="zoomIn" title="Zoom In">+</button>
-    <button class="zoom-btn" id="zoomOut" title="Zoom Out">−</button>
+    <button class="zoom-btn" id="zoomOut" title="Zoom Out">-</button>
     <button class="zoom-btn" id="zoomReset" title="Reset"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
   </div>
 </div>
@@ -237,16 +313,20 @@ const NC={screen:'#58a6ff',component:'#bc8cff',hook:'#56d4dd',store:'#f0883e',se
 const EC={import:'#58a6ff',external:'#d29922',jsx:'#bc8cff',call:'#3fb950',api_call:'#ff7b72',contains:'#484f58',extends:'#f0883e',references:'#56d4dd'};
 const EDASH={import:'none',external:'8,4',jsx:'4,2',call:'2,2',api_call:'6,3',contains:'1,3',extends:'10,3',references:'3,3'};
 const NR={screen:11,component:9,hook:8,store:10,service:8,api:10,file:6,package:7,endpoint:7,function:5,class:8,variable:4};
-const ICONS={screen:'📱',component:'🧩',hook:'🪝',store:'🗄️',service:'⚙️',api:'🌐',file:'📄',package:'📦',endpoint:'🔌',function:'ƒ',class:'C',variable:'v'};
+const ICONS={screen:'\u{1F4F1}',component:'\u{1F9E9}',hook:'\u{1FA9D}',store:'\u{1F5C4}',service:'\u2699\uFE0F',api:'\u{1F310}',file:'\u{1F4C4}',package:'\u{1F4E6}',endpoint:'\u{1F50C}',function:'\u0192',class:'C',variable:'v'};
 
 const LAYER_ORDER=['screen','component','hook','store','service','api','file','function','class','variable','package','endpoint'];
 const LAYER_Y={screen:0,component:1,hook:2,store:3,service:4,api:5,file:6,function:7,class:7,variable:7,package:8,endpoint:5};
+
+const TRACE_COLORS=['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff922b','#cc5de8','#20c997','#845ef7'];
 
 // ── STATE ──
 let data=null,sim=null,svg,g,linkG,nodeG,lblG,zoom;
 let activeView='all',activeTypes=new Set(),searchTerm='',selectedNode=null;
 let nodeMap={},allNodes=[],allEdges=[];
 let _links,_nodeGs,_labels;
+let activeTrace=null;
+let tracePanelOpen=false;
 
 // ── DOM ──
 const $=id=>document.getElementById(id);
@@ -254,6 +334,7 @@ const dropOv=$('dropOverlay'),browseBtn=$('browseBtn'),fileIn=$('fileInput'),loa
 const toolbar=$('toolbar'),pills=$('filterPills'),searchIn=$('searchInput'),hStats=$('headerStats');
 const noData=$('noData'),sp=$('sidePanel'),spBody=$('spBody'),spClose=$('spClose'),spTitle=$('spTitle');
 const viewTabs=$('viewTabs'),layerInd=$('layerIndicator');
+const tracePanel=$('tracePanel'),tpBody=$('tpBody'),tpClose=$('tpClose'),traceToggleBtn=$('traceToggleBtn');
 
 // ── LOAD ──
 function loadData(d){
@@ -261,16 +342,19 @@ function loadData(d){
   allNodes.forEach(n=>nodeMap[n.id]=n);
   activeTypes=new Set(allNodes.map(n=>n.type));
   renderStats();renderPills();renderLayerIndicator();renderGraph();
+  renderTracePanel();
   dropOv.classList.add('hidden');toolbar.style.display='flex';noData.classList.add('hidden');
 }
 
 function renderStats(){
   if(!data)return;const s=data.stats||{};
+  const traceCount=data.traces?data.traces.length:0;
   hStats.innerHTML=`
     <span><span class="n">${allNodes.length}</span> nodes</span>
     <span><span class="n">${allEdges.length}</span> edges</span>
-    <span><span class="n">${s.fileCount||'—'}</span> files</span>
+    <span><span class="n">${s.fileCount||'-'}</span> files</span>
     <span><span class="n">${(s.totalLOC||0).toLocaleString()}</span> LOC</span>
+    <span style="color:var(--trace-1)"><span class="n">${traceCount}</span> traces</span>
     ${data.cycles?.length?`<span style="color:var(--red)"><span class="n">${data.cycles.length}</span> cycles</span>`:''}
   `;
 }
@@ -299,6 +383,175 @@ function renderLayerIndicator(){
     layerInd.appendChild(row);
   });
   layerInd.style.display='flex';
+}
+
+// ── TRACE PANEL ──
+function renderTracePanel(){
+  if(!data||!data.traces||data.traces.length===0){
+    tpBody.innerHTML='<div style="padding:20px;color:var(--t4);font-size:12px;text-align:center">No workflow traces detected.<br><br>Run <code style="background:var(--bg3);padding:2px 6px;border-radius:3px">node analyze.js --init-traces</code> to create custom trace definitions.</div>';
+    return;
+  }
+
+  if(activeTrace){
+    renderTraceDetail(activeTrace);
+  } else {
+    renderTraceList();
+  }
+}
+
+function renderTraceList(){
+  let h='<ul class="trace-list">';
+  for(const t of data.traces){
+    const color=TRACE_COLORS[data.traces.indexOf(t)%TRACE_COLORS.length];
+    const status=t.stats.completePaths>0?'complete':'partial';
+    h+=`<li class="trace-item" data-tid="${t.traceId}" onclick="window._openTrace('${t.traceId}')">
+      <div class="ti-name"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}"></span>${t.name}</div>
+      <div class="ti-desc">${t.description||''}</div>
+      <div class="ti-stats">
+        <span><span class="ts-val">${t.stats.totalSteps}</span> steps</span>
+        <span><span class="ts-val">${t.stats.pathCount}</span> paths</span>
+        <span><span class="ts-val">${t.stats.apiCallCount}</span> APIs</span>
+        <span style="color:${status==='complete'?'var(--green)':'var(--yellow)'}">${status}</span>
+      </div>
+    </li>`;
+  }
+  h+='</ul>';
+  tpBody.innerHTML=h;
+}
+
+function renderTraceDetail(trace){
+  const color=TRACE_COLORS[data.traces.indexOf(trace)%TRACE_COLORS.length];
+  let h='<div class="trace-detail">';
+  h+=`<div class="td-back" onclick="window._backToTraces()"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> All Traces</div>`;
+  h+=`<div class="td-title" style="color:${color}">${trace.name}</div>`;
+  h+=`<div class="td-desc">${trace.description||''}</div>`;
+  h+=`<div class="td-stats">
+    <div class="td-stat"><div class="sv" style="color:${color}">${trace.stats.totalSteps}</div><div class="sl">Steps</div></div>
+    <div class="td-stat"><div class="sv">${trace.stats.filesTouched}</div><div class="sl">Files</div></div>
+    <div class="td-stat"><div class="sv" style="color:var(--orange)">${trace.stats.apiCallCount}</div><div class="sl">API Calls</div></div>
+  </div>`;
+
+  // Timeline
+  h+='<div class="trace-timeline">';
+  const seen=new Set();
+  for(let i=0;i<trace.narrative.length;i++){
+    const step=trace.narrative[i];
+    if(seen.has(step.nodeId))continue;
+    seen.add(step.nodeId);
+    const isLast=i===trace.narrative.length-1;
+    const dotClass=step.isEntry?'entry':step.isExit?'exit':(step.edgeKind==='api_call'?'api':step.type==='store'?'store':'');
+    const dotColor=NC[step.type]||'var(--bd3)';
+    const badges=[];
+    if(step.isEntry)badges.push('<span class="tt-badge entry">START</span>');
+    if(step.isExit)badges.push('<span class="tt-badge exit">END</span>');
+    if(step.edgeKind==='api_call')badges.push('<span class="tt-badge api">API</span>');
+    if(step.type==='store')badges.push('<span class="tt-badge store">STORE</span>');
+
+    h+=`<div class="tt-step" data-nid="${step.nodeId}" onclick="window._hlTraceNode('${step.nodeId}')">
+      <div class="tt-rail">
+        <div class="tt-dot ${dotClass}" style="${dotClass?'':`border-color:${dotColor};background:${dotColor}22`}"></div>
+        ${!isLast?'<div class="tt-line"></div>':''}
+      </div>
+      <div class="tt-content">
+        <div class="tt-name" style="color:${dotColor}">${ICONS[step.type]||''} ${step.name}</div>
+        <div class="tt-meta">
+          <span>${step.type}</span>
+          ${step.file_path?`<span style="color:var(--t4)">${step.file_path.split('/').pop()}</span>`:''}
+          ${step.edgeKind&&step.edgeKind!=='entry'?`<span class="edge-tag">${step.edgeKind}</span>`:''}
+          ${badges.join('')}
+        </div>
+      </div>
+    </div>`;
+  }
+  h+='</div>';
+
+  // API Calls
+  if(trace.apiCalls&&trace.apiCalls.length>0){
+    h+='<div class="ds" style="margin-top:16px"><h4>API Calls</h4><ul class="ds-list">';
+    for(const api of trace.apiCalls){
+      h+=`<li><span class="api-badge get">${api.method||'GET'}</span><span class="nm">${api.url||'-'}</span><span class="lb">from ${api.fromName||api.from}</span></li>`;
+    }
+    h+='</ul></div>';
+  }
+
+  // Store Access
+  if(trace.storeAccess&&trace.storeAccess.length>0){
+    h+='<div class="ds" style="margin-top:8px"><h4>Store Access</h4><ul class="ds-list">';
+    for(const s of trace.storeAccess){
+      h+=`<li><span style="color:var(--cyan)">+</span><span class="nm">${s.storeName||s.store}</span><span class="lb">from ${s.fromName||s.from}</span></li>`;
+    }
+    h+='</ul></div>';
+  }
+
+  // Paths
+  if(trace.paths&&trace.paths.length>0){
+    h+='<div class="ds" style="margin-top:8px"><h4>Discovered Paths ('+trace.paths.length+')</h4><ul class="ds-list">';
+    for(let pi=0;pi<Math.min(trace.paths.length,5);pi++){
+      const p=trace.paths[pi];
+      const entryN=nodeMap[p.entryId]||{name:p.entryId};
+      const exitN=p.exitNodeId?(nodeMap[p.exitNodeId]||{name:p.exitNodeId}):null;
+      h+=`<li><span class="arrow">${p.reachedExit?'>>':'>'}</span><span class="nm">${entryN.name}</span><span class="lb">-> ${exitN?exitN.name:'...'} (${p.steps.length} steps)${p.reachedExit?' complete':''}</span></li>`;
+    }
+    h+='</ul></div>';
+  }
+
+  h+='</div>';
+  tpBody.innerHTML=h;
+}
+
+window._openTrace=function(traceId){
+  if(!data||!data.traces)return;
+  activeTrace=data.traces.find(t=>t.traceId===traceId);
+  if(activeTrace){
+    renderTraceDetail(activeTrace);
+    highlightTraceOnGraph(activeTrace);
+  }
+};
+
+window._backToTraces=function(){
+  activeTrace=null;
+  renderTraceList();
+  clearTraceHighlight();
+};
+
+window._hlTraceNode=function(nodeId){
+  // Highlight specific node on graph
+  _nodeGs?.selectAll('.node-c').classed('trace-hl',d=>d.id===nodeId);
+  _labels?.classed('trace-hl',d=>d.id===nodeId);
+  _links?.classed('trace-hl',d=>(d.source.id||d.source)===nodeId||(d.target.id||d.target)===nodeId);
+
+  // Zoom to node
+  const n=window._nodes?.find(n=>n.id===nodeId);
+  if(n&&svg&&zoom){
+    svg.transition().duration(500).call(zoom.transform,d3.zoomIdentity.translate(svg.node().clientWidth/2-n.x*1.5,svg.node().clientHeight/2-n.y*1.5).scale(1.5));
+  }
+
+  // Also show side panel
+  if(n)selectNode(n);
+};
+
+function highlightTraceOnGraph(trace){
+  if(!trace)return;
+  const traceNodeIds=new Set();
+  for(const step of trace.narrative){
+    traceNodeIds.add(step.nodeId);
+  }
+  for(const span of trace.spans){
+    traceNodeIds.add(span.nodeId);
+  }
+
+  _nodeGs?.selectAll('.node-c')
+    .classed('trace-hl',d=>traceNodeIds.has(d.id))
+    .classed('dim',d=>!traceNodeIds.has(d.id));
+  _labels?.classed('trace-hl',d=>traceNodeIds.has(d.id)).classed('dim',d=>!traceNodeIds.has(d.id));
+  _links?.classed('trace-hl',d=>traceNodeIds.has(d.source.id||d.source)&&traceNodeIds.has(d.target.id||d.target))
+    .classed('dim',d=>!traceNodeIds.has(d.source.id||d.source)||!traceNodeIds.has(d.target.id||d.target));
+}
+
+function clearTraceHighlight(){
+  _nodeGs?.selectAll('.node-c').classed('trace-hl',false).classed('dim',false);
+  _labels?.classed('trace-hl',false).classed('dim',false);
+  _links?.classed('trace-hl',false).classed('dim',false);
 }
 
 // ── VIEW TABS ──
@@ -412,7 +665,6 @@ function renderGraph(){
   ];
 
   if(isArchitecture){
-    // Layered layout: constrain Y by type
     forces.push(d3.forceY(d=>(LAYER_Y[d.type]||5)*(H/10)+50).strength(.8));
     forces.push(d3.forceX(W/2).strength(.05));
   } else {
@@ -439,6 +691,9 @@ function renderGraph(){
     const s=.75/Math.max(b.width/W,b.height/H);
     svg.transition().duration(600).call(zoom.transform,d3.zoomIdentity.translate(W/2-s*(b.x+b.width/2),H/2-s*(b.y+b.height/2)).scale(s));
   },1200);
+
+  // Re-apply trace highlight if active
+  if(activeTrace)highlightTraceOnGraph(activeTrace);
 }
 
 function applyFilters(){renderGraph();if(searchTerm)applySearch(searchTerm)}
@@ -485,13 +740,13 @@ function renderSP(d){
     h+=`<div class="ds"><h4>Metrics</h4><div class="metric-grid">
       <div class="metric-card"><div class="val" style="color:var(--green)">${d.fan_in||0}</div><div class="lbl">Fan-in</div></div>
       <div class="metric-card"><div class="val" style="color:var(--blue)">${d.fan_out||0}</div><div class="lbl">Fan-out</div></div>
-      <div class="metric-card"><div class="val" style="color:var(--orange)">${d.instability!==undefined?d.instability.toFixed(2):'—'}</div><div class="lbl">Instability</div></div>
+      <div class="metric-card"><div class="val" style="color:var(--orange)">${d.instability!==undefined?d.instability.toFixed(2):'-'}</div><div class="lbl">Instability</div></div>
       <div class="metric-card"><div class="val">${(d.fan_in||0)+(d.fan_out||0)}</div><div class="lbl">Total</div></div>
     </div></div>`;
   }
 
   // Size
-  if(d.start_line&&d.end_line)h+=`<div class="ds"><h4>Lines</h4><div class="ds-loc">${d.start_line}–${d.end_line} (${d.end_line-d.start_line+1} lines)</div></div>`;
+  if(d.start_line&&d.end_line)h+=`<div class="ds"><h4>Lines</h4><div class="ds-loc">${d.start_line}-${d.end_line} (${d.end_line-d.start_line+1} lines)</div></div>`;
 
   // Signature
   if(d.signature)h+=`<div class="ds"><h4>Signature</h4><div class="ds-path">${d.signature}</div></div>`;
@@ -502,13 +757,27 @@ function renderSP(d){
   if(d.visibility&&d.visibility!=='public')flags.push(d.visibility);
   if(flags.length)h+=`<div class="ds"><h4>Flags</h4><div>${flags.map(f=>`<span class="ds-badge" style="background:var(--bg3);color:var(--t2);font-size:9px;border:1px solid var(--bd3)">${f}</span>`).join(' ')}</div></div>`;
 
+  // Traces containing this node
+  if(data&&data.traces){
+    const containingTraces=data.traces.filter(t=>t.spans&&t.spans.some(s=>s.nodeId===d.id));
+    if(containingTraces.length>0){
+      h+=`<div class="ds"><h4>Workflow Traces (${containingTraces.length})</h4><ul class="ds-list">`;
+      for(const t of containingTraces){
+        const color=TRACE_COLORS[data.traces.indexOf(t)%TRACE_COLORS.length];
+        const span=t.spans.find(s=>s.nodeId===d.id);
+        h+=`<li onclick="window._openTrace('${t.traceId}')" style="cursor:pointer"><span style="color:${color}">+</span><span class="nm">${t.name}</span><span class="lb">${span.isEntry?'entry':span.isExit?'exit':span.edgeKind}</span></li>`;
+      }
+      h+='</ul></div>';
+    }
+  }
+
   // API calls
   const apiEdges=outgoing.filter(e=>e.kind==='api_call');
   if(apiEdges.length){
     h+=`<div class="ds"><h4>API Calls (${apiEdges.length})</h4><ul class="ds-list">`;
     apiEdges.forEach(e=>{
       const m=e.metadata||{};const method=(m.method||'GET').toLowerCase();
-      h+=`<li><span class="api-badge ${method}">${m.method||'GET'}</span><span class="nm">${m.url||e.label||'—'}</span><span class="lb">${m.type||e.kind}</span></li>`;
+      h+=`<li><span class="api-badge ${method}">${m.method||'GET'}</span><span class="nm">${m.url||e.label||'-'}</span><span class="lb">${m.type||e.kind}</span></li>`;
     });
     h+=`</ul></div>`;
   }
@@ -518,7 +787,7 @@ function renderSP(d){
     h+=`<div class="ds"><h4>Incoming (${incoming.length})</h4><ul class="ds-list">`;
     incoming.forEach(e=>{
       const sid=e.source.id||e.source;const sn=nodeMap[sid];const sc=sn?NC[sn.type]||'#888':'#888';
-      h+=`<li onclick="window._selById('${sid}')"><span class="arrow">←</span><span style="color:${sc}">●</span><span class="nm">${sn?sn.name:sid.split('::').pop()}</span><span class="lb">${e.kind}${e.label?': '+e.label:''}</span></li>`;
+      h+=`<li onclick="window._selById('${sid}')"><span class="arrow"><-</span><span style="color:${sc}">.</span><span class="nm">${sn?sn.name:sid.split('::').pop()}</span><span class="lb">${e.kind}${e.label?': '+e.label:''}</span></li>`;
     });
     h+=`</ul></div>`;
   }
@@ -528,7 +797,7 @@ function renderSP(d){
     h+=`<div class="ds"><h4>Outgoing (${outgoing.length})</h4><ul class="ds-list">`;
     outgoing.forEach(e=>{
       const tid=e.target.id||e.target;const tn=nodeMap[tid];const tc=tn?NC[tn.type]||'#888':'#888';
-      h+=`<li onclick="window._selById('${tid}')"><span class="arrow">→</span><span style="color:${tc}">●</span><span class="nm">${tn?tn.name:tid.split('::').pop()}</span><span class="lb">${e.kind}${e.label?': '+e.label:''}</span></li>`;
+      h+=`<li onclick="window._selById('${tid}')"><span class="arrow">-></span><span style="color:${tc}">.</span><span class="nm">${tn?tn.name:tid.split('::').pop()}</span><span class="lb">${e.kind}${e.label?': '+e.label:''}</span></li>`;
     });
     h+=`</ul></div>`;
   }
@@ -556,6 +825,20 @@ $('zoomReset').onclick=()=>{
 
 // ── SIDE PANEL ──
 spClose.onclick=()=>{sp.classList.remove('open');selectedNode=null;_nodeGs?.selectAll('.node-c').classed('sel',false)};
+
+// ── TRACE PANEL ──
+traceToggleBtn.onclick=()=>{
+  tracePanelOpen=!tracePanelOpen;
+  tracePanel.classList.toggle('open',tracePanelOpen);
+  traceToggleBtn.classList.toggle('active',tracePanelOpen);
+};
+tpClose.onclick=()=>{
+  tracePanelOpen=false;
+  tracePanel.classList.remove('open');
+  traceToggleBtn.classList.remove('active');
+  activeTrace=null;
+  clearTraceHighlight();
+};
 
 // ── SEARCH ──
 searchIn.oninput=e=>{searchTerm=e.target.value;applySearch(searchTerm)};

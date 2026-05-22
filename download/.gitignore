@@ -1,0 +1,5 @@
+node_modules/
+.codegraph/
+graph.json
+*.db
+.DS_Store
