@@ -10,6 +10,7 @@ CodeMap is a local static analysis tool that maps your React Native / React / No
 - **5 Graph Views** — Dependencies, Component Tree, Call Graph, API Flow, Architecture
 - **15+ Auto-Detected Workflow Traces** — Auth (6 sub-flows!), Navigation, Data Fetch, State, Forms, Payment, Errors, Storage, Real-time, Permissions, Notifications, Analytics, Onboarding, Theme, i18n
 - **40+ Sub-Flows** — Granular tracing within each workflow (login, logout, token refresh, protected routes, signup, password reset under Auth alone)
+- **File Exclusion System** — `.codegraphignore`, `.codegraph/config.json`, and CLI flags to exclude files/dirs from analysis
 - **Deep Semantic Extraction** — Detects React Navigation, Auth contexts, Context API, Redux/Zustand, Formik, Error Boundaries, WebSocket, AsyncStorage, Permissions, Deep Links, Push Notifications, Analytics, and more
 - **Sub-Flow Architecture** — Each trace contains granular sub-flows (e.g., Auth → Login, Logout, Token Refresh, Protected Route, Signup, Password Reset)
 - **Security-Aware** — Flags secure storage access, auth token handling, and sensitive data flows
@@ -130,6 +131,152 @@ CodeMap automatically detects 15+ workflow categories with 40+ sub-flows:
 | 🎨 **Theme** | Theme Switching | ThemeProvider, useTheme, darkMode, Appearance |
 | 🌍 **i18n** | Translation | useTranslation, i18n, formatMessage, LanguageProvider |
 
+## File Exclusion
+
+Control which files and directories get analyzed. There are 3 ways to exclude files:
+
+### 1. `.codegraphignore` (like .gitignore)
+
+Create a `.codegraphignore` file in your project root:
+
+```bash
+node analyze.js --init-ignore
+```
+
+Then edit it:
+
+```gitignore
+# Exclude generated files
+**/generated/**
+**/*.generated.*
+**/*.auto.*
+
+# Exclude config files
+babel.config.*
+metro.config.*
+webpack.config.*
+
+# Exclude storybook
+**/*.stories.*
+
+# Exclude specific directories
+src/legacy/**
+src/temp/**
+
+# Exclude by extension
+*.d.ts
+
+# Re-include a file that was excluded (use ! prefix)
+!src/generated/important.ts
+```
+
+**Pattern syntax:**
+| Pattern | Matches |
+|---------|---------|
+| `*` | Any characters except `/` |
+| `**` | Any characters including `/` (cross-directory) |
+| `?` | Single character |
+| `!` prefix | Negation (re-include) |
+| `#` | Comment |
+| `dir/` | Entire directory at any depth |
+| `/dir/` | Directory at root only |
+
+### 2. `.codegraph/config.json` (JSON config)
+
+Create a config file:
+
+```bash
+node analyze.js --init-config
+```
+
+Then edit `.codegraph/config.json`:
+
+```json
+{
+  "exclude": [
+    "**/generated/**",
+    "**/*.stories.*",
+    "**/*.d.ts",
+    "src/legacy/**"
+  ],
+  "include": [
+    "!src/generated/important.ts"
+  ],
+  "excludeDirs": [
+    "scripts",
+    "tools",
+    "docs"
+  ],
+  "excludeExtensions": [
+    ".d.ts",
+    ".test.ts"
+  ],
+  "maxFileSize": 500000,
+  "onlyDirs": [
+    "src",
+    "app"
+  ]
+}
+```
+
+**Config fields:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `exclude` | `string[]` | Glob patterns to exclude |
+| `include` | `string[]` | Glob patterns to re-include (overrides exclude) |
+| `excludeDirs` | `string[]` | Directory names to skip entirely (added to built-in list) |
+| `excludeExtensions` | `string[]` | File extensions to skip (e.g., `.d.ts`) |
+| `maxFileSize` | `number` | Skip files larger than this (bytes) |
+| `onlyDirs` | `string[]` | If set, ONLY scan these directories |
+
+### 3. CLI Flags
+
+```bash
+# Exclude specific patterns
+node analyze.js --exclude "**/generated/**"
+node analyze.js --exclude "*.stories.*" --exclude "src/legacy/**"
+
+# Only include matching files
+node analyze.js --only "src/screens/**"
+
+# Only scan specific directories
+node analyze.js --only-dirs src
+node analyze.js --only-dirs src --only-dirs app
+
+# Skip large files
+node analyze.js --max-file-size 500000
+```
+
+### Priority Order
+
+Exclusion rules are applied in this priority:
+
+1. **Include rules** (highest) — `!` patterns in `.codegraphignore`, `include` in config, `--only` CLI flag
+2. **Exclude rules** — patterns in `.codegraphignore`, `exclude` in config, `--exclude` CLI flag
+3. **Directory rules** — `excludeDirs` in config, `--only-dirs` CLI flag
+4. **Built-in defaults** — `node_modules`, `.expo`, `android`, `ios`, `dist`, `build`, etc.
+
+### Built-in Excluded Directories
+
+These are always skipped:
+`node_modules`, `.expo`, `android`, `ios`, `assets`, `.git`, `__tests__`, `__mocks__`, `__snapshots__`, `dist`, `build`, `.cache`, `.next`, `coverage`, `.vscode`, `.idea`, `.codegraph`
+
+### Common Patterns
+
+```bash
+# Only analyze screens and components
+node analyze.js --only-dirs src/screens --only-dirs src/components
+
+# Skip generated code and types
+node analyze.js --exclude "**/generated/**" --exclude "**/*.d.ts"
+
+# Focus on auth-related files only
+node analyze.js --only "**/auth/**" --only "**/login/**"
+
+# Skip storybook and test files
+node analyze.js --exclude "**/*.stories.*" --exclude "**/*.test.*" --exclude "**/*.spec.*"
+```
+
 ## Visualizer Guide
 
 ### Views
@@ -182,7 +329,7 @@ code_map/
 ├── visualizer.html     # Self-contained interactive web UI
 ├── package.json        # Dependencies
 ├── lib/
-│   ├── parser.js       # Babel AST parser (file discovery + symbol extraction)
+│   ├── parser.js       # Babel AST parser + file exclusion system
 │   ├── storage.js      # SQLite storage backend (WAL, FTS5, migrations)
 │   ├── graph.js        # Core graph algorithms (BFS, DFS, cycles, communities)
 │   ├── query.js        # Fluent query builder
@@ -190,7 +337,14 @@ code_map/
 │   └── tracer.js       # Workflow tracing engine
 └── .codegraph/
     ├── codegraph.db    # Auto-generated SQLite database
+    ├── config.json     # Exclusion config (exclude/include/onlyDirs)
     └── traces.json     # User-defined trace definitions
+
+# In your project root:
+your-project/
+├── .codegraphignore    # .gitignore-style exclusion patterns
+└── .codegraph/
+    └── config.json     # JSON exclusion configuration
 ```
 
 ### Node Types

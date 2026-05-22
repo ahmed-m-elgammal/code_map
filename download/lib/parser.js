@@ -1,10 +1,19 @@
 /**
- * parser.js — Babel-based AST Parser v3.5 — Deep Semantic Extraction
+ * parser.js — Babel-based AST Parser v3.6 — Deep Semantic Extraction
  *
  * Parses .js, .jsx, .ts, .tsx files with @babel/parser + @babel/traverse.
  * Extracts fine-grained symbols AND deep semantic relationships:
  *
- * NEW in v3.5:
+ * NEW in v3.6:
+ *   - File exclusion system with .codegraphignore support
+ *   - .codegraph/config.json with exclude/include/onlyDirs settings
+ *   - CLI flags: --exclude, --only, --only-dirs, --max-file-size
+ *   - --init-ignore and --init-config to scaffold config files
+ *   - Glob pattern matching (*, **, ?, !negation)
+ *   - Directory-level pruning for performance
+ *   - File size limit enforcement
+ *
+ * v3.5 features:
  *   - React Navigation detection (navigate, push, goBack, useNavigation, Stack.Screen)
  *   - Auth pattern detection (useAuth, isAuthenticated, ProtectedRoute, AuthContext, token)
  *   - React Context detection (createContext, useContext, XxxProvider)
@@ -102,21 +111,323 @@ function safeRelative(fullPath, root) {
   try { return path.relative(root, fullPath).replace(/\\/g, '/'); } catch { return fullPath; }
 }
 
+// ──────────── File Exclusion / Ignore System ────────────
+
+/**
+ * Convert a .codegraphignore glob pattern to a RegExp.
+ * Supports:
+ *   - * matches anything except /
+ *   - ** matches anything including /
+ *   - ! prefix negates (re-include)
+ *   - # comments
+ *   - /dir/ matches directory at any depth
+ *   - dir/ matches directory at any depth
+ *   - *.ext matches file extension
+ *   - path/file matches specific file
+ */
+function globToRegex(pattern, rootDir) {
+  let p = pattern.trim();
+  const negated = p.startsWith('!');
+  if (negated) p = p.slice(1);
+
+  // Remove leading / (it's relative to root)
+  if (p.startsWith('/')) p = p.slice(1);
+
+  // Escape regex special chars, then convert glob wildcards
+  let re = p
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')  // escape special chars
+    .replace(/\*\*/g, '{{GLOBSTAR}}')        // preserve **
+    .replace(/\*/g, '[^/]*')                  // * matches non-/
+    .replace(/\?/g, '[^/]')                   // ? matches single non-/
+    .replace(/\{\{GLOBSTAR\}\}/g, '.*');      // ** matches anything
+
+  // If pattern ends with /, match any file under that dir
+  if (re.endsWith('/')) re = re + '.*';
+
+  // If pattern has no / in it, match at any depth (basename match)
+  if (!p.includes('/')) {
+    re = '(^|.*/)' + re;
+  } else {
+    re = '.*' + re; // prefix match for path patterns
+  }
+
+  try {
+    return { regex: new RegExp(re, 'i'), negated };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse a .codegraphignore file and return exclusion rules.
+ * Returns { exclude: RegExp[], include: RegExp[] }
+ */
+function parseIgnoreFile(filePath, rootDir) {
+  const rules = { exclude: [], include: [] };
+  if (!fs.existsSync(filePath)) return rules;
+
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    for (let line of content.split('\n')) {
+      line = line.trim();
+      // Skip empty lines and comments
+      if (!line || line.startsWith('#')) continue;
+
+      const rule = globToRegex(line, rootDir);
+      if (!rule) continue;
+
+      if (rule.negated) {
+        rules.include.push(rule.regex);
+      } else {
+        rules.exclude.push(rule.regex);
+      }
+    }
+  } catch (e) {
+    // Silently ignore parse errors
+  }
+  return rules;
+}
+
+/**
+ * Load .codegraph/config.json exclusion settings.
+ * Config format:
+ * {
+ *   "exclude": ["pattern1", "pattern2", ...],
+ *   "include": ["pattern3", ...],
+ *   "excludeDirs": ["dirname1", ...],
+ *   "excludeExtensions": [".ext1", ...],
+ *   "maxFileSize": 500000,
+ *   "onlyDirs": ["src", "app"],
+ *   "onlyTypes": ["screen", "component"]
+ * }
+ */
+function loadConfig(rootDir) {
+  const configPath = path.join(rootDir, '.codegraph', 'config.json');
+  const defaultConfig = {
+    exclude: [],
+    include: [],
+    excludeDirs: [],
+    excludeExtensions: [],
+    maxFileSize: 1_000_000,
+    onlyDirs: [],
+    onlyTypes: [],
+  };
+
+  if (!fs.existsSync(configPath)) return defaultConfig;
+
+  try {
+    const content = fs.readFileSync(configPath, 'utf-8');
+    const parsed = JSON.parse(content);
+    return { ...defaultConfig, ...parsed };
+  } catch {
+    return defaultConfig;
+  }
+}
+
+/**
+ * Build the complete exclusion context from all sources:
+ *   1. Default IGNORE_DIRS
+ *   2. .codegraph/config.json
+ *   3. .codegraphignore file
+ *   4. CLI --exclude patterns
+ *   5. CLI --include-only patterns
+ *
+ * Returns an object with:
+ *   - excludeRegexes: RegExp[] - patterns that exclude files
+ *   - includeRegexes: RegExp[] - patterns that re-include excluded files (negation)
+ *   - extraIgnoreDirs: Set<string> - additional directory names to skip
+ *   - excludeExtensions: Set<string> - file extensions to skip
+ *   - maxFileSize: number - max file size in bytes
+ *   - onlyDirs: string[] - if set, only scan these directories
+ *   - stats: { rulesFrom... } - debug info
+ */
+function buildExclusionContext(rootDir, cliOptions = {}) {
+  const ctx = {
+    excludeRegexes: [],
+    includeRegexes: [],
+    extraIgnoreDirs: new Set(),
+    excludeExtensions: new Set(),
+    maxFileSize: cliOptions.maxFileSize || 1_000_000,
+    onlyDirs: [],
+    stats: {
+      rulesFromConfig: 0,
+      rulesFromIgnoreFile: 0,
+      rulesFromCLI: 0,
+      totalExclude: 0,
+      totalInclude: 0,
+    },
+  };
+
+  // 1. Load .codegraph/config.json
+  const config = loadConfig(rootDir);
+  for (const p of (config.exclude || [])) {
+    const rule = globToRegex(p, rootDir);
+    if (rule && !rule.negated) ctx.excludeRegexes.push(rule.regex);
+    if (rule && rule.negated) ctx.includeRegexes.push(rule.regex);
+    ctx.stats.rulesFromConfig++;
+  }
+  for (const p of (config.include || [])) {
+    const rule = globToRegex(p, rootDir);
+    if (rule) ctx.includeRegexes.push(rule.regex);
+    ctx.stats.rulesFromConfig++;
+  }
+  for (const d of (config.excludeDirs || [])) {
+    ctx.extraIgnoreDirs.add(d);
+  }
+  for (const ext of (config.excludeExtensions || [])) {
+    ctx.excludeExtensions.add(ext.startsWith('.') ? ext : '.' + ext);
+  }
+  if (config.maxFileSize) ctx.maxFileSize = config.maxFileSize;
+  if (config.onlyDirs && config.onlyDirs.length > 0) {
+    ctx.onlyDirs = config.onlyDirs;
+  }
+
+  // 2. Load .codegraphignore
+  const ignorePath = path.join(rootDir, '.codegraphignore');
+  const ignoreRules = parseIgnoreFile(ignorePath, rootDir);
+  ctx.excludeRegexes.push(...ignoreRules.exclude);
+  ctx.includeRegexes.push(...ignoreRules.include);
+  ctx.stats.rulesFromIgnoreFile = ignoreRules.exclude.length + ignoreRules.include.length;
+
+  // 3. CLI --exclude patterns
+  for (const p of (cliOptions.exclude || [])) {
+    const rule = globToRegex(p, rootDir);
+    if (rule && !rule.negated) ctx.excludeRegexes.push(rule.regex);
+    if (rule && rule.negated) ctx.includeRegexes.push(rule.regex);
+    ctx.stats.rulesFromCLI++;
+  }
+
+  // 4. CLI --include-only patterns (these become include rules)
+  for (const p of (cliOptions.includeOnly || [])) {
+    const rule = globToRegex(p, rootDir);
+    if (rule) ctx.includeRegexes.push(rule.regex);
+  }
+
+  // 5. CLI --only-dirs
+  if (cliOptions.onlyDirs && cliOptions.onlyDirs.length > 0) {
+    ctx.onlyDirs = cliOptions.onlyDirs;
+  }
+
+  ctx.stats.totalExclude = ctx.excludeRegexes.length;
+  ctx.stats.totalInclude = ctx.includeRegexes.length;
+
+  return ctx;
+}
+
+/**
+ * Check if a relative file path should be excluded based on the exclusion context.
+ * Returns true if the file should be EXCLUDED (skipped).
+ */
+function shouldExcludePath(relativePath, ctx) {
+  const normalized = relativePath.replace(/\\/g, '/');
+
+  // Check include rules FIRST (they override exclusions)
+  for (const re of ctx.includeRegexes) {
+    if (re.test(normalized)) return false; // explicitly included
+  }
+
+  // Check exclude rules
+  for (const re of ctx.excludeRegexes) {
+    if (re.test(normalized)) return true; // excluded
+  }
+
+  return false; // not excluded
+}
+
+/**
+ * Check if a directory should be skipped during walk.
+ */
+function shouldSkipDir(dirName, fullPath, rootDir, ctx) {
+  // Default ignore dirs
+  if (IGNORE_DIRS.has(dirName)) return true;
+  // Extra ignore dirs from config
+  if (ctx.extraIgnoreDirs.has(dirName)) return true;
+  // Hidden dirs (except .env)
+  if (dirName.startsWith('.') && dirName !== '.env') return true;
+
+  // If onlyDirs is set, only enter dirs that match
+  if (ctx.onlyDirs && ctx.onlyDirs.length > 0) {
+    const relDir = safeRelative(fullPath, rootDir).replace(/\\/g, '/');
+    const matchesAllowed = ctx.onlyDirs.some(d => {
+      const dn = d.replace(/\\/g, '/');
+      return relDir === dn || relDir.startsWith(dn + '/') || dn.startsWith(relDir + '/');
+    });
+    if (!matchesAllowed) return true;
+  }
+
+  // Check directory against exclusion patterns
+  const relDir = safeRelative(fullPath, rootDir).replace(/\\/g, '/');
+  // Include rules first
+  for (const re of ctx.includeRegexes) {
+    if (re.test(relDir + '/')) return false;
+  }
+  for (const re of ctx.excludeRegexes) {
+    if (re.test(relDir + '/')) return true;
+  }
+
+  return false;
+}
+
 // ──────────── File Discovery ────────────
 
-function discoverFiles(rootDir) {
+function discoverFiles(rootDir, options = {}) {
+  const ctx = buildExclusionContext(rootDir, options);
   const files = [];
+  let excludedCount = 0;
+
   function walk(dir) {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
-      if (IGNORE_DIRS.has(entry.name)) continue;
-      if (entry.name.startsWith('.') && entry.name !== '.env') continue;
       const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(fullPath);
-      else if (entry.isFile() && VALID_EXTENSIONS.has(path.extname(entry.name))) files.push(fullPath);
+
+      if (entry.isDirectory()) {
+        if (shouldSkipDir(entry.name, fullPath, rootDir, ctx)) continue;
+        walk(fullPath);
+      } else if (entry.isFile()) {
+        // Check extension
+        const ext = path.extname(entry.name);
+        if (!VALID_EXTENSIONS.has(ext)) continue;
+        // Check excluded extensions
+        if (ctx.excludeExtensions.has(ext)) continue;
+
+        const relPath = safeRelative(fullPath, rootDir);
+
+        // Check exclusion patterns
+        if (shouldExcludePath(relPath, ctx)) {
+          excludedCount++;
+          continue;
+        }
+
+        // Check file size
+        try {
+          const stat = fs.statSync(fullPath);
+          if (stat.size > ctx.maxFileSize) {
+            excludedCount++;
+            continue;
+          }
+        } catch {
+          continue;
+        }
+
+        files.push(fullPath);
+      }
     }
   }
+
   walk(rootDir);
+
+  // Attach exclusion stats for reporting
+  files._exclusionStats = {
+    excludedFiles: excludedCount,
+    excludeRules: ctx.stats.totalExclude,
+    includeRules: ctx.stats.totalInclude,
+    rulesFromConfig: ctx.stats.rulesFromConfig,
+    rulesFromIgnoreFile: ctx.stats.rulesFromIgnoreFile,
+    rulesFromCLI: ctx.stats.rulesFromCLI,
+    onlyDirs: ctx.onlyDirs,
+    extraIgnoreDirs: [...ctx.extraIgnoreDirs],
+  };
+
   return files;
 }
 
@@ -1151,4 +1462,9 @@ function extractMethodFromArgs(args) {
   return 'GET';
 }
 
-module.exports = { analyzeFile, discoverFiles, inferNodeType, nodeId, fileNodeId, pkgNodeId, endpointNodeId, routeNodeId, safeRelative, detectSemanticRole };
+module.exports = {
+  analyzeFile, discoverFiles, inferNodeType, nodeId, fileNodeId, pkgNodeId,
+  endpointNodeId, routeNodeId, safeRelative, detectSemanticRole,
+  globToRegex, parseIgnoreFile, loadConfig, buildExclusionContext,
+  shouldExcludePath, shouldSkipDir,
+};
